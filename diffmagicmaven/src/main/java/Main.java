@@ -90,7 +90,7 @@ public class Main {
                     @Override
                     public boolean visit(SimpleName node) {
                         IBinding binding = node.resolveBinding();
-                        String usageId = generateId(node);
+                        String usageId = JsonVisitor.generateId(node);
                         if (binding != null) {
                             String defId = binding.getKey();
                             nameResEdges.add(new Edge(usageId, defId));
@@ -100,40 +100,13 @@ public class Main {
                         return super.visit(node);
                     }
                 });
+                
+                JsonVisitor jsonVisitor = new JsonVisitor(compilationUnit);
+                compilationUnit.accept(jsonVisitor);
 
                 // Collect AST structure and store as a tree (in the desired format)
-                Map<String, Object> tree = new HashMap<>();
-                tree.put("fileName", filePath);
-                tree.put("node", "CompilationUnit");
-                tree.put("id", generateId(compilationUnit));
-                tree.put("location", compilationUnit.getStartPosition());
-
-                // Collect package information
-                PackageDeclaration packageDecl = compilationUnit.getPackage();
-                if (packageDecl != null) {
-                    Map<String, Object> packageData = new HashMap<>();
-                    packageData.put("node", "PackageDeclaration");
-                    packageData.put("id", generateId(packageDecl));
-                    packageData.put("location", packageDecl.getStartPosition());
-                    SimpleName packageName = (SimpleName) packageDecl.getName();
-                    Map<String, Object> nameData = new HashMap<>();
-                    nameData.put("node", "SimpleName");
-                    nameData.put("id", generateId(packageName));
-                    nameData.put("location", packageName.getStartPosition());
-                    nameData.put("identifier", packageName.getIdentifier());
-                    packageData.put("name", nameData);
-                    tree.put("package", packageData);
-                }
-
-                // Collecting types and their details
-                List<Map<String, Object>> types = new ArrayList<>();
-                for (Object type : compilationUnit.types()) {
-                    TypeDeclaration typeDecl = (TypeDeclaration) type;
-                    Map<String, Object> typeData = collectTypeDetails(typeDecl);
-                    types.add(typeData);
-                }
-                tree.put("types", types);
-
+                Map<String, Object> tree = jsonVisitor.jsonMap;
+                
                 // Store the result for this file
                 filesDetails.add(new FileDetails(filePath, tree, nameResEdges));
             }
@@ -172,63 +145,5 @@ public class Main {
             }
         }
         return javaFiles;
-    }
-
-    // Generate a unique ID for a node (usage)
-    public static String generateId(ASTNode node) {
-        return node.getClass().getSimpleName() + "@" + node.getStartPosition();
-    }
-
-    // Collect details of a type declaration
-    public static Map<String, Object> collectTypeDetails(TypeDeclaration typeDecl) {
-        Map<String, Object> typeData = new HashMap<>();
-        typeData.put("node", "TypeDeclaration");
-        typeData.put("id", generateId(typeDecl));
-        typeData.put("location", typeDecl.getStartPosition());
-        typeData.put("modifiers", collectModifiers(typeDecl.modifiers()));
-
-        // Collect type name
-        SimpleName typeName = typeDecl.getName();
-        Map<String, Object> nameData = new HashMap<>();
-        nameData.put("node", "SimpleName");
-        nameData.put("id", generateId(typeName));
-        nameData.put("location", typeName.getStartPosition());
-        nameData.put("identifier", typeName.getIdentifier());
-        typeData.put("name", nameData);
-
-        // Collect methods
-        List<Map<String, Object>> methods = new ArrayList<>();
-        for (MethodDeclaration method : typeDecl.getMethods()) {
-            Map<String, Object> methodData = collectMethodDetails(method);
-            methods.add(methodData);
-        }
-        typeData.put("methods", methods);
-
-        return typeData;
-    }
-
-    // Collect details of a method declaration
-    public static Map<String, Object> collectMethodDetails(MethodDeclaration methodDecl) {
-        Map<String, Object> methodData = new HashMap<>();
-        methodData.put("node", "MethodDeclaration");
-        methodData.put("id", generateId(methodDecl));
-        methodData.put("location", methodDecl.getStartPosition());
-        methodData.put("name", methodDecl.getName().getIdentifier());
-        return methodData;
-    }
-
-    // Collect modifiers
-    public static List<Map<String, Object>> collectModifiers(List<?> modifiers) {
-        List<Map<String, Object>> modifierData = new ArrayList<>();
-        for (Object mod : modifiers) {
-            Modifier modifier = (Modifier) mod;
-            Map<String, Object> modData = new HashMap<>();
-            modData.put("node", "Modifier");
-            modData.put("id", generateId(modifier));
-            modData.put("location", modifier.getStartPosition());
-            modData.put("keyword", modifier.getKeyword().toString());
-            modifierData.add(modData);
-        }
-        return modifierData;
     }
 }
