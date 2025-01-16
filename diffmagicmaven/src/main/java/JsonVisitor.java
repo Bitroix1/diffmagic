@@ -17,13 +17,17 @@ public class JsonVisitor extends ASTVisitor {
     }
 	
 	private void handleASTNode(ASTNode node, Map<String, Object> nodeMap) {
-		nodeMap.put("nodeType", node.getClass().getName());
+		nodeMap.put("nodeType", node.getClass().getSimpleName());
 		nodeMap.put("line", cu.getLineNumber(node.getStartPosition()));
 		nodeMap.put("column", cu.getColumnNumber(node.getStartPosition()));
 		nodeMap.put("id", generateId(node));
 	}
 	
 	private Object getNodeJson(ASTNode node) {
+		if (node == null) {
+	        return "null";
+	    }
+		
 		JsonVisitor visitor = new JsonVisitor(this.cu);
 		node.accept(visitor);
 		return visitor.jsonMap == null ? node.getClass().getSimpleName() + " IS NOT IMPLEMENTED!!!" : visitor.jsonMap;
