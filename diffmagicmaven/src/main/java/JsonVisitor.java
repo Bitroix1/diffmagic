@@ -21,6 +21,7 @@ public class JsonVisitor extends ASTVisitor {
 		nodeMap.put("line", cu.getLineNumber(node.getStartPosition()));
 		nodeMap.put("column", cu.getColumnNumber(node.getStartPosition()));
 		nodeMap.put("id", generateId(node));
+		nodeMap.put("uniqueId", node.hashCode());
 	}
 	
 	private Object getNodeJson(ASTNode node) {
@@ -933,6 +934,7 @@ public class JsonVisitor extends ASTVisitor {
 		handleASTNode(node, jsonMap);
 		
 		jsonMap.put("name", getNodeJson(node.getName()));
+		jsonMap.put("modifiers", getListOf(node.modifiers()));
 		jsonMap.put("parameters", getListOf(node.parameters()));
 		jsonMap.put("body", getNodeJson(node.getBody()));
 		jsonMap.put("returnType", getNodeJson(node.getReturnType2()));
@@ -980,6 +982,12 @@ public class JsonVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(Modifier node) {
+		jsonMap = new HashMap<>();
+
+		handleASTNode(node, jsonMap);
+
+		jsonMap.put("keyword", node.getKeyword().toString());
+		
 		return false;
 	}
 
@@ -1571,6 +1579,7 @@ public class JsonVisitor extends ASTVisitor {
 			methodDeclarationList.add(getNodeJson(methodDeclaration));
 		}
 		
+		jsonMap.put("name", node.getName().toString());
 		jsonMap.put("fields", fieldDeclarationList);
 		jsonMap.put("methods", methodDeclarationList);
 		
