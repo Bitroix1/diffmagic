@@ -1326,6 +1326,7 @@ public class JsonVisitor extends ASTVisitor {
 		
 		handleASTNode(node, jsonMap);
 		
+		jsonMap.put("name", getNodeJson(node.getName()));
 		jsonMap.put("type", getNodeJson(node.getType()));
 		
 		return false;
