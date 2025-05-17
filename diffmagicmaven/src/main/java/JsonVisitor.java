@@ -20,6 +20,8 @@ public class JsonVisitor extends ASTVisitor {
 		nodeMap.put("nodeType", node.getClass().getSimpleName());
 		nodeMap.put("line", cu.getLineNumber(node.getStartPosition()));
 		nodeMap.put("column", cu.getColumnNumber(node.getStartPosition()));
+		nodeMap.put("endLine", cu.getLineNumber(node.getStartPosition() + node.getLength()));
+		nodeMap.put("endColumn", cu.getColumnNumber(node.getStartPosition() + node.getLength()));		
 		nodeMap.put("id", generateId(node));
 		nodeMap.put("uniqueId", node.hashCode());
 	}
@@ -192,6 +194,14 @@ public class JsonVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(Assignment node) {
+		jsonMap = new HashMap<>();
+
+		handleASTNode(node, jsonMap);
+
+		jsonMap.put("leftHandSide", getNodeJson(node.getLeftHandSide()));
+		jsonMap.put("operator", node.getOperator().toString());
+		jsonMap.put("rightHandSide", getNodeJson(node.getRightHandSide()));
+		
 		return false;
 	}
 
@@ -365,8 +375,8 @@ public class JsonVisitor extends ASTVisitor {
 		
 		handleASTNode(node, jsonMap);
 		
-		jsonMap.put("imports", getListOf(node.imports()));
 		jsonMap.put("package", getNodeJson(node.getPackage()));
+		jsonMap.put("imports", getListOf(node.imports()));
 		jsonMap.put("types", getListOf(node.types()));
 		
 		return false;
@@ -1736,13 +1746,17 @@ public class JsonVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(VariableDeclarationFragment node) {
-		jsonMap = new HashMap<>();
-
-		handleASTNode(node, jsonMap);
-		
-		jsonMap.put("name", getNodeJson(node.getName()));
-		
-		return false;
+	    jsonMap = new HashMap<>();
+	    
+	    handleASTNode(node, jsonMap);
+	    
+	    jsonMap.put("name", getNodeJson(node.getName()));
+	    
+	    if (node.getInitializer() != null) {
+	        jsonMap.put("initializer", getNodeJson(node.getInitializer()));
+	    }
+	    
+	    return false;
 	}
 
 	/**
