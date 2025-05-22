@@ -144,9 +144,9 @@ public class Main {
             // Convert to JSONObject for content_id processing
             JSONObject jsonObject = new JSONObject(jsonStr);
 
-            // Update content IDs
-            JsonTraverser.updateContentId(jsonObject);
-            
+            // Update num_descendants values in the syntax tree
+            JsonTraverser.updateNumDescendants(jsonObject);
+
             // Generate and add syntax info
             JSONArray syntaxInfo = JsonTraverser.generateSyntaxInfo(jsonObject);
             jsonObject.put("syntaxInfo", syntaxInfo);

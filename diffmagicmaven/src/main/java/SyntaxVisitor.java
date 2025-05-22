@@ -9,7 +9,7 @@ public class SyntaxVisitor extends ASTVisitor {
     private CompilationUnit cu;
     public Map<String, Object> syntaxMap = null;
     private char[] source;
-	private static int uniqueId = 1;
+	private static int uniqueId = 0;//TODO - should start from last id of lhs if its rhs
     
     SyntaxVisitor(CompilationUnit cu, char[] source) {
         this.cu = cu;
@@ -38,6 +38,7 @@ public class SyntaxVisitor extends ASTVisitor {
         nodeMap.put("open_position", openPosition);
         nodeMap.put("close_content", closeContent);
         nodeMap.put("close_position", closePosition);
+		nodeMap.put("num_descendants", 0); // will be fixed later
     }
     
     private Object getNodeSyntax(ASTNode node) {
@@ -51,11 +52,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	}
 	
 	private Object getListOf(List list) {
-		List<Object> objectList = new ArrayList<>();
 		if (list == null || list.isEmpty()) {
 			return null; // Return null instead of empty list
 		}
 		
+		// If there's only one element, return it directly without wrapping in a list
+		if (list.size() == 1) {
+			Object object = list.get(0);
+			if (object instanceof ASTNode) {
+				ASTNode node = (ASTNode)object;
+				return getNodeSyntax(node);
+			}
+			return object;
+		}
+		
+		// For multiple elements, create a list as normal
+		List<Object> objectList = new ArrayList<>();
 		for (Object object : list) {
 			if (object instanceof ASTNode) {
 				ASTNode node = (ASTNode)object;
@@ -1440,6 +1452,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @return <code>true</code> if the children of this node should be
 	 * visited, and <code>false</code> if the children of this node should
 	 * be skipped
+	 * @since 3.1
 	 */
 	public boolean visit(SimpleName node) {
 		syntaxMap = new HashMap<>();
@@ -1826,7 +1839,6 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @return <code>true</code> if the children of this node should be
 	 * visited, and <code>false</code> if the children of this node should
 	 * be skipped
-	 * 
 	 * @since 3.10
 	 */
 	public boolean visit(TypeMethodReference node) {

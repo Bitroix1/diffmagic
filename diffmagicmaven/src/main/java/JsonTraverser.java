@@ -1,7 +1,4 @@
-import java.util.Iterator;
 import java.util.function.BiConsumer;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.*;
 
 import org.json.JSONArray;
@@ -338,9 +335,19 @@ public class JsonTraverser {
                         parentMap.put(childId, parentId);
                     }
                 } else if (child instanceof JSONArray) {
-                    // Handle nested arrays inside the children field
-                    // This is important for your JSON structure
-                    processChildrenForParent(child, parentId, parentMap);
+                    // If child is a JSONArray with a single JSONObject element,
+                    // process it directly instead of as a nested array
+                    JSONArray nestedArray = (JSONArray) child;
+                    if (nestedArray.length() == 1 && nestedArray.get(0) instanceof JSONObject) {
+                        JSONObject nestedObj = nestedArray.getJSONObject(0);
+                        if (nestedObj.has("id")) {
+                            int childId = nestedObj.getInt("id");
+                            parentMap.put(childId, parentId);
+                        }
+                    } else {
+                        // Handle nested arrays that don't fit the above pattern
+                        processChildrenForParent(child, parentId, parentMap);
+                    }
                 }
             }
         }
@@ -449,6 +456,53 @@ public class JsonTraverser {
     }
     
     /**
+     * Updates the number of descendants for each list node
+     * (total number of nodes in the subtree, excluding the node itself)
+     * Using the existing traversePostorder method
+     */
+    private static void updateNumDescendants(
+            Map<Integer, Integer> parentMap,
+            Map<Integer, JSONObject> nodesById,
+            Map<Integer, Integer> numDescendantsMap) {
+        
+        // Group nodes by parent for easier child lookup
+        Map<Integer, List<Integer>> childrenByParent = new HashMap<>();
+        for (Map.Entry<Integer, Integer> entry : parentMap.entrySet()) {
+            int childId = entry.getKey();
+            int parentId = entry.getValue();
+            
+            childrenByParent.computeIfAbsent(parentId, k -> new ArrayList<>()).add(childId);
+        }
+        
+        List<Integer> allNodeIds = new ArrayList<>(nodesById.keySet());
+        Map<String, Integer> nodeCountByPath = new HashMap<>();
+        
+        JSONArray syntaxArray = new JSONArray();
+        for (JSONObject node : nodesById.values()) {
+            syntaxArray.put(node);
+        }
+        
+        traversePostorder(syntaxArray, (node, path) -> {
+            if (node instanceof JSONObject) {
+                JSONObject obj = (JSONObject) node;
+                
+                if (obj.has("id")) {
+                    int nodeId = obj.getInt("id");
+                    int directChildrenCount = childrenByParent.getOrDefault(nodeId, Collections.emptyList()).size();
+                    int descendantsOfChildren = 0;
+                    
+                    for (Integer childId : childrenByParent.getOrDefault(nodeId, Collections.emptyList())) {
+                        descendantsOfChildren += numDescendantsMap.getOrDefault(childId, 0);
+                    }
+                    
+                    int totalDescendants = directChildrenCount + descendantsOfChildren;
+                    numDescendantsMap.put(nodeId, totalDescendants);
+                }
+            }
+        });
+    }
+
+    /**
      * Creates the final syntaxInfo JSON array from the relationship maps
      * Uses a flat structure with specific field names as required
      * IDs are stored as numbers, and null values are stored as "None" strings
@@ -462,7 +516,7 @@ public class JsonTraverser {
             Map<Integer, Integer> numAncestorsMap,
             Map<Integer, Integer> numAfterMap,
             Map<Integer, Boolean> isUniqueMap) {
-        
+    
         JSONArray syntaxInfo = new JSONArray();
         
         for (Map.Entry<Integer, JSONObject> entry : nodesById.entrySet()) {
@@ -471,48 +525,141 @@ public class JsonTraverser {
             
             JSONObject infoNode = new JSONObject();
             
-            // Basic node identification
+            // Add all fields except num_descendants
             infoNode.put("id", nodeId);
             
-            // Content identification
             if (node.has("content_id")) {
                 infoNode.put("content_id", node.getInt("content_id"));
             } else {
                 infoNode.put("content_id", 0);  // Default value
             }
             
-            // Parent relationship
             Integer parentId = parentMap.get(nodeId);
             infoNode.put("parent", parentId != null ? parentId : "None");
             
-            // Previous sibling relationship
             Integer prevSiblingId = prevSiblingMap.get(nodeId);
             infoNode.put("prev_sibling", prevSiblingId != null ? prevSiblingId : "None");
             
-            // Next sibling relationship
             Integer nextSiblingId = nextSiblingMap.get(nodeId);
             infoNode.put("next_sibling", nextSiblingId != null ? nextSiblingId : "None");
             
-            // Previous node relationship
             Integer prevNodeId = prevNodeMap.get(nodeId);
             infoNode.put("prev_node", prevNodeId != null ? prevNodeId : "None");
             
-            // Number of ancestors (depth)
             int numAncestors = numAncestorsMap.getOrDefault(nodeId, 0);
             infoNode.put("num_ancestors", numAncestors);
             
-            // Number of nodes after
             int numAfter = numAfterMap.getOrDefault(nodeId, 0);
             infoNode.put("num_after", numAfter);
-            
-            // Uniqueness info
+                    
             boolean unique = isUniqueMap.getOrDefault(nodeId, true);
             infoNode.put("is_unique", unique);
             
-            // Add to syntaxInfo array
             syntaxInfo.put(infoNode);
         }
         
         return syntaxInfo;
+    }
+
+    /**
+     * Updates the num_descendants field for all list nodes in the syntax tree.
+     * Similar to updateContentId, this method ensures each list node correctly
+     * reflects the number of descendants in its subtree.
+     * 
+     * @param jsonObject The JSON object containing a "syntax" field to update
+     */
+    public static void updateNumDescendants(JSONObject jsonObject) {
+        if (!jsonObject.has("syntax")) {
+            return; // Nothing to update
+        }
+        
+        // Get the syntax array
+        JSONArray syntaxArray = jsonObject.getJSONArray("syntax");
+        
+        // Build a map of parent relationships for faster lookup
+        Map<Integer, Integer> parentMap = new HashMap<>();
+        traversePreorder(syntaxArray, (node, path) -> {
+            if (node instanceof JSONObject) {
+                JSONObject obj = (JSONObject) node;
+                
+                if (obj.has("node_kind") && obj.getString("node_kind").equals("list") && obj.has("children")) {
+                    int parentId = obj.getInt("id");
+                    Object children = obj.get("children");
+                    
+                    buildParentMap(children, parentId, parentMap);
+                }
+            }
+        });
+        
+        // Create a map to store all JSON objects by their ID for direct access
+        Map<Integer, JSONObject> nodesById = new HashMap<>();
+        traversePreorder(syntaxArray, (node, path) -> {
+            if (node instanceof JSONObject) {
+                JSONObject obj = (JSONObject) node;
+                if (obj.has("id")) {
+                    nodesById.put(obj.getInt("id"), obj);
+                }
+            }
+        });
+        
+        // Group nodes by parent for easier child lookup
+        Map<Integer, List<Integer>> childrenByParent = new HashMap<>();
+        for (Map.Entry<Integer, Integer> entry : parentMap.entrySet()) {
+            int childId = entry.getKey();
+            int parentId = entry.getValue();
+            
+            childrenByParent.computeIfAbsent(parentId, k -> new ArrayList<>()).add(childId);
+        }
+        
+        // Process in post-order to ensure children are processed before parents
+        traversePostorder(syntaxArray, (node, path) -> {
+            if (node instanceof JSONObject) {
+                JSONObject obj = (JSONObject) node;
+                
+                if (obj.has("id") && obj.has("node_kind") && obj.getString("node_kind").equals("list")) {
+                    int nodeId = obj.getInt("id");
+                    int directChildrenCount = childrenByParent.getOrDefault(nodeId, Collections.emptyList()).size();
+                    int descendantsOfChildren = 0;
+                    
+                    for (Integer childId : childrenByParent.getOrDefault(nodeId, Collections.emptyList())) {
+                        JSONObject childObj = nodesById.get(childId);
+                        
+                        if (childObj.has("node_kind") && childObj.getString("node_kind").equals("list") && 
+                                childObj.has("num_descendants")) {
+                            // Add this child's descendants
+                            descendantsOfChildren += childObj.getInt("num_descendants");
+                        }
+                    }
+                    
+                    // Total descendants = direct children + descendants of children
+                    int totalDescendants = directChildrenCount + descendantsOfChildren;
+                    obj.put("num_descendants", totalDescendants);
+                }
+            }
+        });
+    }
+
+    /**
+     * Builds the parent map for descendants calculation
+     */
+    private static void buildParentMap(Object children, int parentId, Map<Integer, Integer> parentMap) {
+        if (children instanceof JSONArray) {
+            JSONArray childArray = (JSONArray) children;
+            
+            for (int i = 0; i < childArray.length(); i++) {
+                Object child = childArray.get(i);
+                
+                if (child instanceof JSONObject) {
+                    JSONObject childObj = (JSONObject) child;
+                    if (childObj.has("id")) {
+                        int childId = childObj.getInt("id");
+                        parentMap.put(childId, parentId);
+                    }
+                } else if (child instanceof JSONArray) {
+                    // Handle nested arrays inside the children field
+                    buildParentMap(child, parentId, parentMap);
+                }
+            }
+        }
     }
 }
