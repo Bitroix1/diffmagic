@@ -9,7 +9,7 @@ public class SyntaxVisitor extends ASTVisitor {
     private CompilationUnit cu;
     public Map<String, Object> syntaxMap = null;
     private char[] source;
-	private static int uniqueId = 0;//TODO - should start from last id of lhs if its rhs
+	private static int uniqueId = 1;//TODO - should start from last id of lhs+1 if its rhs , otherwise 1
     
     SyntaxVisitor(CompilationUnit cu, char[] source) {
         this.cu = cu;

@@ -104,9 +104,8 @@ public class Main {
                 });
                 
                 // Processing each file:
-
-                Statement stmt = (Statement)((TypeDeclaration)compilationUnit.types().getFirst()).getMethods()[0].getBody().statements().getFirst();
-
+                //TODO, remove if you want to look at the whole tree- accept on CU instead below
+                SimpleName stmt = ((VariableDeclarationFragment)((VariableDeclarationStatement)((TypeDeclaration)compilationUnit.types().getFirst()).getMethods()[0].getBody().statements().getFirst()).fragments().getFirst()).getName();
                 JsonVisitor jsonVisitor = new JsonVisitor(compilationUnit);
                 //compilationUnit.accept(jsonVisitor);
                 stmt.accept(jsonVisitor);
