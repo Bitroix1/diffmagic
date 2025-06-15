@@ -45,117 +45,184 @@ public class Main {
 
     public static void main(String[] args) {
         try {
-            // Directory containing Java files
-            String sourceDir = "C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\Files\\Java";
+            // Two directories for LHS and RHS comparison
+            String lhsSourceDir = "C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\Files\\lhs";
+            String rhsSourceDir = "C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\Files\\rhs";
 
-            List<String> javaFiles = getAllJavaFiles(new File(sourceDir));
-
-            List<char[]> sources = new ArrayList<>();
-            for (String filePath : javaFiles) {
-                sources.add(new String(Files.readAllBytes(Paths.get(filePath))).toCharArray());
+            // Process LHS files
+            List<String> lhsJavaFiles = getAllJavaFiles(new File(lhsSourceDir));
+            List<FileDetails> lhsFilesDetails = processFiles(lhsJavaFiles, null, null, 1);
+            
+            // Output LHS data
+            Map<String, Object> lhsOutput = new HashMap<>();
+            List<Map<String, Object>> lhsTrees = new ArrayList<>();
+            List<Edge> lhsNameResEdges = new ArrayList<>();
+            List<Map<String, Object>> lhsSyntaxes = new ArrayList<>();
+            
+            for (FileDetails fileDetails : lhsFilesDetails) {
+                lhsTrees.add(fileDetails.tree);
+                lhsNameResEdges.addAll(fileDetails.nameResEdges);
+                lhsSyntaxes.add(fileDetails.syntax);
             }
-
-            // Classpath setup
-            String[] classpathEntries = { System.getProperty("java.home") + "\\lib\\rt.jar" }; // May need to adust based on JDK version
-            String[] sourcepathEntries = { sourceDir }; // Sourcepath includes all Java files
-
-            List<FileDetails> filesDetails = new ArrayList<>();
-            for (int i = 0; i < javaFiles.size(); i++) {
-                String filePath = javaFiles.get(i);
-                char[] source = sources.get(i);
-
-                // Create and configure the parser
-                ASTParser parser = ASTParser.newParser(AST.JLS8);
-                parser.setKind(ASTParser.K_COMPILATION_UNIT);
-                parser.setResolveBindings(true);
-                parser.setBindingsRecovery(true);
-                parser.setEnvironment(classpathEntries, sourcepathEntries, new String[] { "UTF-8" }, true);
-                parser.setUnitName(new File(filePath).getName());
-                parser.setSource(source);
-
-                CompilationUnit compilationUnit = (CompilationUnit) parser.createAST(null);
-                List<Edge> nameResEdges = new ArrayList<>();
-
-                // Visit the AST to collect bindings
-                compilationUnit.accept(new ASTVisitor() {
-                    @Override
-                    public boolean visit(SimpleName node) {
-                        IBinding binding = node.resolveBinding();
-                        String usageId = JsonVisitor.generateId(node);
-                        int usageIdNum = node.hashCode();
-                        
-                        if (binding != null) {
-                            String defId = binding.getKey();
-                            int defIdNum = 0;
-
-                            if (binding.getJavaElement() != null) {
-                                defIdNum = binding.getJavaElement().hashCode();
-                            } else {
-                                // Fallback to using the binding's hashCode
-                                defIdNum = binding.hashCode();
-                            }
-
-                            nameResEdges.add(new Edge(usageId, defId, usageIdNum, defIdNum));
-                        } else {
-                            nameResEdges.add(new Edge(usageId, "null", usageIdNum, -1));
-                        }
-                        return super.visit(node);
-                    }
-                });
-                
-                // Processing each file:
-                //TODO, remove if you want to look at the whole tree- accept on CU instead below
-                SimpleName stmt = ((VariableDeclarationFragment)((VariableDeclarationStatement)((TypeDeclaration)compilationUnit.types().getFirst()).getMethods()[0].getBody().statements().getFirst()).fragments().getFirst()).getName();
-                JsonVisitor jsonVisitor = new JsonVisitor(compilationUnit);
-                //compilationUnit.accept(jsonVisitor);
-                stmt.accept(jsonVisitor);
-                Map<String, Object> tree = jsonVisitor.jsonMap;
-                
-                SyntaxVisitor syntaxVisitor = new SyntaxVisitor(compilationUnit, source);
-                //compilationUnit.accept(syntaxVisitor);
-                stmt.accept(syntaxVisitor);
-                Map<String, Object> syntax = syntaxVisitor.syntaxMap;
-                
-                filesDetails.add(new FileDetails(filePath, tree, nameResEdges, syntax));
-            }
-
-            // Prepare JSON output
-            Map<String, Object> jsonOutput = new HashMap<>();
-            List<Map<String, Object>> trees = new ArrayList<>();
-            List<Edge> allNameResEdges = new ArrayList<>();
-            List<Map<String, Object>> syntaxes = new ArrayList<>();
-
-            for (FileDetails fileDetails : filesDetails) {
-                trees.add(fileDetails.tree);
-                allNameResEdges.addAll(fileDetails.nameResEdges);
-                syntaxes.add(fileDetails.syntax);
-            }
-
-            // Add edges, trees and syntax to the JSON output
-            jsonOutput.put("nameResEdges", allNameResEdges);
-            jsonOutput.put("trees", trees);
-            jsonOutput.put("syntax", syntaxes);
-
-            // Convert to JSON with pretty printing
+            
+            lhsOutput.put("nameResEdges", lhsNameResEdges);
+            lhsOutput.put("trees", lhsTrees);
+            lhsOutput.put("syntax", lhsSyntaxes);
+            
+            // Convert LHS to JSON with pretty printing
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            String jsonStr = gson.toJson(jsonOutput);
+            String lhsJsonStr = gson.toJson(lhsOutput);
             
             // Convert to JSONObject for content_id processing
-            JSONObject jsonObject = new JSONObject(jsonStr);
-
+            JSONObject lhsJsonObject = new JSONObject(lhsJsonStr);
+            
             // Update num_descendants values in the syntax tree
-            JsonTraverser.updateNumDescendants(jsonObject);
-
+            JsonTraverser.updateNumDescendants(lhsJsonObject);
+            
             // Generate and add syntax info
-            JSONArray syntaxInfo = JsonTraverser.generateSyntaxInfo(jsonObject);
-            jsonObject.put("syntaxInfo", syntaxInfo);
+            JSONArray lhsSyntaxInfo = JsonTraverser.generateSyntaxInfo(lhsJsonObject);
+            lhsJsonObject.put("syntaxInfo", lhsSyntaxInfo);
+            
+            // Output the LHS JSON
+            System.out.println("LHS OUTPUT:");
+            System.out.println(lhsJsonObject.toString(2)); // Can use .getJSONArray("syntax")
+            
+            // Get the last uniqueId used for LHS processing
+            int lastLhsUniqueId = SyntaxVisitor.getLastUniqueId();
+            
+            // Get the content ID cache and list ID cache from JsonTraverser
+            Map<String, Integer> contentIdCache = JsonTraverser.getContentIdCache();
+            Map<Integer, Integer> listIdCache = JsonTraverser.getListIdCache();
 
-            // Output the updated JSON with syntaxInfo
-            System.out.println(jsonObject.toString(2));
-
+            // Process RHS files, starting from last LHS uniqueId + 1
+            List<String> rhsJavaFiles = getAllJavaFiles(new File(rhsSourceDir));
+            List<FileDetails> rhsFilesDetails = processFiles(rhsJavaFiles, contentIdCache, listIdCache, lastLhsUniqueId + 1);
+            
+            // Output RHS data
+            Map<String, Object> rhsOutput = new HashMap<>();
+            List<Map<String, Object>> rhsTrees = new ArrayList<>();
+            List<Edge> rhsNameResEdges = new ArrayList<>();
+            List<Map<String, Object>> rhsSyntaxes = new ArrayList<>();
+            
+            for (FileDetails fileDetails : rhsFilesDetails) {
+                rhsTrees.add(fileDetails.tree);
+                rhsNameResEdges.addAll(fileDetails.nameResEdges);
+                rhsSyntaxes.add(fileDetails.syntax);
+            }
+            
+            rhsOutput.put("nameResEdges", rhsNameResEdges);
+            rhsOutput.put("trees", rhsTrees);
+            rhsOutput.put("syntax", rhsSyntaxes);
+            
+            // Convert RHS to JSON with pretty printing
+            String rhsJsonStr = gson.toJson(rhsOutput);
+            
+            // Convert to JSONObject for content_id processing
+            JSONObject rhsJsonObject = new JSONObject(rhsJsonStr);
+            
+            // Update num_descendants values in the syntax tree
+            JsonTraverser.updateNumDescendants(rhsJsonObject);
+            
+            // Generate and add syntax info
+            JSONArray rhsSyntaxInfo = JsonTraverser.generateSyntaxInfo(rhsJsonObject);
+            rhsJsonObject.put("syntaxInfo", rhsSyntaxInfo);
+            
+            // Output the RHS JSON
+            System.out.println("\nRHS OUTPUT:");
+            System.out.println(rhsJsonObject.toString(2));
+            
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    // Helper method to process files
+    private static List<FileDetails> processFiles(
+            List<String> javaFiles, 
+            Map<String, Integer> contentIdCache,
+            Map<Integer, Integer> listIdCache, // Add this parameter
+            int startUniqueId) throws Exception {
+        List<FileDetails> filesDetails = new ArrayList<>();
+        List<char[]> sources = new ArrayList<>();
+        
+        for (String filePath : javaFiles) {
+            sources.add(new String(Files.readAllBytes(Paths.get(filePath))).toCharArray());
+        }
+
+        // Classpath setup
+        String[] classpathEntries = { System.getProperty("java.home") + "\\lib\\rt.jar" };
+        String[] sourcepathEntries = { new File(javaFiles.get(0)).getParent() };
+
+        // Set the starting uniqueId for SyntaxVisitor
+        if (startUniqueId > 1) {
+            SyntaxVisitor.setStartingUniqueId(startUniqueId);
+        }
+
+        for (int i = 0; i < javaFiles.size(); i++) {
+            String filePath = javaFiles.get(i);
+            char[] source = sources.get(i);
+
+            // Create and configure the parser
+            ASTParser parser = ASTParser.newParser(AST.JLS8);
+            parser.setKind(ASTParser.K_COMPILATION_UNIT);
+            parser.setResolveBindings(true);
+            parser.setBindingsRecovery(true);
+            parser.setEnvironment(classpathEntries, sourcepathEntries, new String[] { "UTF-8" }, true);
+            parser.setUnitName(new File(filePath).getName());
+            parser.setSource(source);
+
+            CompilationUnit compilationUnit = (CompilationUnit) parser.createAST(null);
+            List<Edge> nameResEdges = new ArrayList<>();
+
+            // Visit the AST to collect bindings
+            compilationUnit.accept(new ASTVisitor() {
+                @Override
+                public boolean visit(SimpleName node) {
+                    IBinding binding = node.resolveBinding();
+                    String usageId = JsonVisitor.generateId(node);
+                    int usageIdNum = node.hashCode();
+                    
+                    if (binding != null) {
+                        String defId = binding.getKey();
+                        int defIdNum = 0;
+
+                        if (binding.getJavaElement() != null) {
+                            defIdNum = binding.getJavaElement().hashCode();
+                        } else {
+                            // Fallback to using the binding's hashCode
+                            defIdNum = binding.hashCode();
+                        }
+
+                        nameResEdges.add(new Edge(usageId, defId, usageIdNum, defIdNum));
+                    } else {
+                        nameResEdges.add(new Edge(usageId, "null", usageIdNum, -1));
+                    }
+                    return super.visit(node);
+                }
+            });
+            
+            // Start node- default should be compilationUnit
+            CompilationUnit root = compilationUnit;
+            
+            JsonVisitor jsonVisitor = new JsonVisitor(compilationUnit);
+            root.accept(jsonVisitor);
+            Map<String, Object> tree = jsonVisitor.jsonMap;
+            
+            // Create SyntaxVisitor with the content ID cache if available
+            SyntaxVisitor syntaxVisitor;
+            if (contentIdCache != null) {
+                syntaxVisitor = new SyntaxVisitor(compilationUnit, source, contentIdCache, listIdCache);
+            } else {
+                syntaxVisitor = new SyntaxVisitor(compilationUnit, source);
+            }
+            
+            root.accept(syntaxVisitor);
+            Map<String, Object> syntax = syntaxVisitor.syntaxMap;
+            
+            filesDetails.add(new FileDetails(filePath, tree, nameResEdges, syntax));
+        }
+
+        return filesDetails;
     }
 
     // Recursively collect all .java files in a directory

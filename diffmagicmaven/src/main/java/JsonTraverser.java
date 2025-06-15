@@ -8,7 +8,17 @@ import org.json.JSONObject;
  * Utility class for traversing JSON structures in preorder and postorder
  */
 public class JsonTraverser {
-    
+    public static Map<String, Integer> getContentIdCache() {
+        return contentIdCache;
+    }
+
+    public static Map<Integer, Integer> getListIdCache() {
+        return listIdCache;
+    }
+
+    private static Map<String, Integer> contentIdCache = new HashMap<>();
+    private static Map<Integer, Integer> listIdCache = new HashMap<>();
+
     /**
      * Traverse a JSON structure in preorder (parent first, then children)
      * 
@@ -91,9 +101,22 @@ public class JsonTraverser {
             return; // Nothing to update
         }
         
-        // Create a cache to ensure consistent content IDs for atoms
-        Map<String, Integer> contentIdCache = new HashMap<>();
-        int[] nextId = {1}; // Array to allow modification in lambda
+        // Don't reset the cache if it exists already, neede for rhs
+        
+        // Start the nextId from the highest existing ID + 1
+        int[] nextId = {1}; 
+        for (int id : contentIdCache.values()) {
+            if (id >= nextId[0]) {
+                nextId[0] = id + 1;
+            }
+        }
+        
+        // Also check the list ID cache for the highest ID
+        for (int id : listIdCache.values()) {
+            if (id >= nextId[0]) {
+                nextId[0] = id + 1;
+            }
+        }
         
         // Get the syntax array
         JSONArray syntaxArray = jsonObject.getJSONArray("syntax");
@@ -123,33 +146,26 @@ public class JsonTraverser {
                         obj.put("content_id", contentId);
                     } 
                     else if ("list".equals(nodeKind)) {
-                        // For lists, always use a new unique ID
-                        obj.put("content_id", nextId[0]++);
+                        // For lists, use a unique ID based on the list's ID
+                        if (obj.has("id")) {
+                            int listUniqueId = obj.getInt("id");
+                            int contentId;
+                            
+                            if (listIdCache.containsKey(listUniqueId)) {
+                                // Reuse existing ID for this list
+                                contentId = listIdCache.get(listUniqueId);
+                            } else {
+                                // Create new ID for this list
+                                contentId = nextId[0]++;
+                                listIdCache.put(listUniqueId, contentId);
+                            }
+                            
+                            obj.put("content_id", contentId);
+                        }
                     }
                 }
             }
         });
-    }
-    
-    /**
-     * Helper method to update content_id for a specific node
-     */
-    private static void updateContentIdForNode(
-            JSONObject obj, 
-            String content, 
-            Map<String, Integer> contentIdCache, 
-            int[] nextId) {
-        // Get or create content ID
-        int contentId;
-        if (contentIdCache.containsKey(content)) {
-            contentId = contentIdCache.get(content);
-        } else {
-            contentId = nextId[0]++;
-            contentIdCache.put(content, contentId);
-        }
-        
-        // Update the content_id in the object
-        obj.put("content_id", contentId);
     }
 
     /**
@@ -454,53 +470,6 @@ public class JsonTraverser {
             }
         }
     }
-    
-    /**
-     * Updates the number of descendants for each list node
-     * (total number of nodes in the subtree, excluding the node itself)
-     * Using the existing traversePostorder method
-     */
-    private static void updateNumDescendants(
-            Map<Integer, Integer> parentMap,
-            Map<Integer, JSONObject> nodesById,
-            Map<Integer, Integer> numDescendantsMap) {
-        
-        // Group nodes by parent for easier child lookup
-        Map<Integer, List<Integer>> childrenByParent = new HashMap<>();
-        for (Map.Entry<Integer, Integer> entry : parentMap.entrySet()) {
-            int childId = entry.getKey();
-            int parentId = entry.getValue();
-            
-            childrenByParent.computeIfAbsent(parentId, k -> new ArrayList<>()).add(childId);
-        }
-        
-        List<Integer> allNodeIds = new ArrayList<>(nodesById.keySet());
-        Map<String, Integer> nodeCountByPath = new HashMap<>();
-        
-        JSONArray syntaxArray = new JSONArray();
-        for (JSONObject node : nodesById.values()) {
-            syntaxArray.put(node);
-        }
-        
-        traversePostorder(syntaxArray, (node, path) -> {
-            if (node instanceof JSONObject) {
-                JSONObject obj = (JSONObject) node;
-                
-                if (obj.has("id")) {
-                    int nodeId = obj.getInt("id");
-                    int directChildrenCount = childrenByParent.getOrDefault(nodeId, Collections.emptyList()).size();
-                    int descendantsOfChildren = 0;
-                    
-                    for (Integer childId : childrenByParent.getOrDefault(nodeId, Collections.emptyList())) {
-                        descendantsOfChildren += numDescendantsMap.getOrDefault(childId, 0);
-                    }
-                    
-                    int totalDescendants = directChildrenCount + descendantsOfChildren;
-                    numDescendantsMap.put(nodeId, totalDescendants);
-                }
-            }
-        });
-    }
 
     /**
      * Creates the final syntaxInfo JSON array from the relationship maps
@@ -661,5 +630,9 @@ public class JsonTraverser {
                 }
             }
         }
+    }
+
+    public static void setListIdCache(Map<Integer, Integer> externalListIdCache) {
+        listIdCache = new HashMap<>(externalListIdCache);
     }
 }
