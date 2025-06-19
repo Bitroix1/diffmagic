@@ -168,8 +168,8 @@ public class SyntaxVisitor extends ASTVisitor {
         if (startPosition < 0 || length <= 0) {
             return "0:0-0";
         }
-        int startLine = cu.getLineNumber(startPosition);
-        int startCol = cu.getColumnNumber(startPosition);
+        int startLine = cu.getLineNumber(startPosition) - 1;
+        int startCol = cu.getColumnNumber(startPosition) - 1;
         int endCol = startCol + length;
         
         return startLine + ":" + startCol + "-" + endCol;
