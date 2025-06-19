@@ -39,7 +39,6 @@ public class SyntaxVisitor extends ASTVisitor {
         }
     }
     
-    // Add this constructor
     SyntaxVisitor(CompilationUnit cu, char[] source, Map<String, Integer> externalContentIdCache, Map<Integer, Integer> externalListIdCache) {
         this.cu = cu;
         this.source = source;
@@ -139,13 +138,23 @@ public class SyntaxVisitor extends ASTVisitor {
 			return object;
 		}
 		
-		// For multiple elements, create a proper list node
+		// For multiple elements, track the positions of first and last nodes
 		List<Object> objectList = new ArrayList<>();
+		int firstNodeStart = -1;
+		int lastNodeEnd = -1;
+		
 		for (Object object : list) {
 			if (object instanceof ASTNode) {
 				ASTNode node = (ASTNode)object;
+				
+				// Track positions of first and last valid node
+				if (firstNodeStart == -1) {
+					firstNodeStart = node.getStartPosition();
+				}
+				lastNodeEnd = node.getStartPosition() + node.getLength();
+				
+				// Process node and add to list
 				Object result = getNodeSyntax(node);
-				// Only add non-null results
 				if (result != null) {
 					objectList.add(result);
 				}
@@ -156,24 +165,74 @@ public class SyntaxVisitor extends ASTVisitor {
 			return null;
 		}
 		
-		// Create a proper list node instead of returning the raw ArrayList
+		// Convert positions to strings
+		String openPosition = firstNodeStart != -1 ? getPositionString(firstNodeStart, 0) : "0:0-0";
+		String closePosition = lastNodeEnd != -1 ? getPositionString(lastNodeEnd, 0) : "0:0-0";
+		
+		// Create a proper list node with the determined positions
 		Map<String, Object> listNode = new HashMap<>();
-		createList(listNode, "", "0:0-0", "", "0:0-0");
+		createList(listNode, "", openPosition, "", closePosition);
 		listNode.put("children", objectList);
 		return listNode;
 	}
 
     // Get position as a string in format "line:column-endColumn"
     private String getPositionString(int startPosition, int length) {
-        if (startPosition < 0 || length <= 0) {
+        if (startPosition < 0 || length < 0) {
             return "0:0-0";
         }
+        // Convert from 1-indexed (Eclipse JDT) to 0-indexed
         int startLine = cu.getLineNumber(startPosition) - 1;
-        int startCol = cu.getColumnNumber(startPosition) - 1;
+        int startCol = cu.getColumnNumber(startPosition);
         int endCol = startCol + length;
         
         return startLine + ":" + startCol + "-" + endCol;
     }
+
+	// Find the position of a specific character in the source
+	private String findCharacterPosition(char character, int searchStart, int searchEnd) {
+		for (int i = searchStart; i < searchEnd && i < source.length; i++) {
+			if (source[i] == character) {
+				int line = cu.getLineNumber(i) - 1;
+				int col = cu.getColumnNumber(i) - 1;
+				return line + ":" + col + "-" + (col + 1);
+			}
+		}
+		return "0:0-0"; // Fallback if not found
+	}
+
+	// Find the exact position of list delimiters
+	private String findOpenPosition(ASTNode node) {
+		int nodeStart = node.getStartPosition();
+		
+		if (node instanceof Block || node instanceof TypeDeclaration) {
+			// For blocks and type declarations, find the '{'
+			return findCharacterPosition('{', nodeStart, nodeStart + 30);
+		} else if (node instanceof MethodInvocation) {
+			// For method invocations, find the '('
+			MethodInvocation mi = (MethodInvocation) node;
+			int nameEnd = mi.getName().getStartPosition() + mi.getName().getLength();
+			return findCharacterPosition('(', nameEnd, nameEnd + 5);
+		}
+		
+		// Default: use the node's start position
+		return getPositionString(nodeStart, 0);
+	}
+
+	private String findClosePosition(ASTNode node) {
+		int nodeEnd = node.getStartPosition() + node.getLength();
+		
+		if (node instanceof Block || node instanceof TypeDeclaration) {
+			// For blocks and type declarations, find the '}'
+			return findCharacterPosition('}', nodeEnd - 10, nodeEnd);
+		} else if (node instanceof MethodInvocation) {
+			// For method invocations, find the ')'
+			return findCharacterPosition(')', nodeEnd - 5, nodeEnd);
+		}
+		
+		// Default: use the node's end position
+		return getPositionString(nodeEnd, 0);
+	}
 
 	/**
 	 * Visits the given type-specific AST node.
@@ -375,7 +434,10 @@ public class SyntaxVisitor extends ASTVisitor {
 	public boolean visit(Block node) {
 		syntaxMap = new HashMap<>();
 		
-		createList(syntaxMap, "{", getPositionString(node.getStartPosition(), 1), "}", getPositionString(node.getStartPosition() + node.getLength(), 1));
+		String openPosition = findOpenPosition(node);
+		String closePosition = findClosePosition(node);
+		
+		createList(syntaxMap, "{", openPosition, "}", closePosition);
 		
 		ArrayList children = new ArrayList<>();
 		Object statements = getListOf(node.statements());
@@ -752,7 +814,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * Visits the given type-specific AST node.
 	 * <p>
 	 * The default implementation does nothing and return true.
-	 * Subclasses may re-implement.
+	 * Subclasses may reimplement.
 	 * </p>
 	 *
 	 * @param node the node to visit
@@ -1205,7 +1267,6 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @return <code>true</code> if the children of this node should be
 	 * visited, and <code>false</code> if the children of this node should
 	 * be skipped
-	 * @since 3.1
 	 */
 	public boolean visit(MethodDeclaration node) {
 		syntaxMap = new HashMap<>();
@@ -1803,6 +1864,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @return <code>true</code> if the children of this node should be
 	 * visited, and <code>false</code> if the children of this node should
 	 * be skipped
+	 * @since 3.10
 	 */
 	public boolean visit(SwitchCase node) {
 		return false;
@@ -2162,6 +2224,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @return <code>true</code> if the children of this node should be
 	 * visited, and <code>false</code> if the children of this node should
 	 * be skipped
+	 * @since 3.1
 	 */
 	public boolean visit(WhileStatement node) {
 		return false;
