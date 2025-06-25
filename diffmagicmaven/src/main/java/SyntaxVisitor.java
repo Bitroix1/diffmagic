@@ -542,6 +542,23 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(CatchClause node) {
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "{", getPositionString(node.getStartPosition(), 1), "}", getPositionString(node.getStartPosition() + node.getLength(), 1));
+		
+        ArrayList children = new ArrayList<>();
+		Object nodeBody = getNodeSyntax(node.getBody());
+		if (nodeBody != null) {
+			children.add(nodeBody);
+		}
+		Object nodeException = getNodeSyntax(node.getException());
+		if (nodeException != null) {
+			children.add(nodeException);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
 		return false;
 	}
 
@@ -790,6 +807,14 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(EnumConstantDeclaration node) {
+		syntaxMap = new HashMap<>();
+		String content = node.getName().toString();
+
+		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
+		syntaxMap.put("kind", "Normal");
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
 		return false;
 	}
 
@@ -807,6 +832,20 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(EnumDeclaration node) {
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList children = new ArrayList<>();
+		System.out.println("Yabba Dabba");
+		Object nodeConstants = getListOf(node.enumConstants());
+		if (nodeConstants != null) {
+			children.add(nodeConstants);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
 		return false;
 	}
 
@@ -906,6 +945,23 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(FieldDeclaration node) {
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList children = new ArrayList<>();
+		Object nodeFragments = getListOf(node.fragments());
+		if (nodeFragments != null) {
+			children.add(nodeFragments);
+		}
+		Object nodeType = getNodeSyntax(node.getType());
+		if (nodeType != null) {
+			children.add(nodeType);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
 		return false;
 	}
 
@@ -1072,6 +1128,18 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(Initializer node) {
+		syntaxMap = new HashMap<>();
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList children = new ArrayList<>();
+		Object body = getNodeSyntax(node.getBody());
+		if (body != null) {
+			children.add(body);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
 		return false;
 	}
 
@@ -1984,6 +2052,27 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(TryStatement node) {
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "{", getPositionString(node.getStartPosition(), 1), "}", getPositionString(node.getStartPosition() + node.getLength(), 1));
+		
+        ArrayList children = new ArrayList<>();
+		Object catchClauses = getListOf(node.catchClauses());
+		if (catchClauses != null) {
+			children.add(catchClauses);
+		}
+		Object nodeBody = getNodeSyntax(node.getBody());
+		if (nodeBody != null) {
+			children.add(nodeBody);
+		}
+		Object nodeFinally = getNodeSyntax(node.getFinally());
+		if (nodeFinally != null) {
+			children.add(nodeFinally);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
 		return false;
 	}
 	/**
@@ -2011,6 +2100,10 @@ public class SyntaxVisitor extends ASTVisitor {
 		Object nodeFields = getListOf(Arrays.asList(node.getFields()));
 		if (nodeFields != null) {
 			children.add(nodeFields);
+		}
+		Object nodeDeclarations = getListOf(node.bodyDeclarations());
+		if (nodeDeclarations != null) {
+			children.add(nodeDeclarations);
 		}
 		Object nodeMethods = getListOf(Arrays.asList(node.getMethods()));
 		if (nodeMethods != null) {

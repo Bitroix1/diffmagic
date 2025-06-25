@@ -48,8 +48,8 @@ public class Main {
     public static void main(String[] args) {
         try {
             // Two directories for LHS and RHS comparison
-            String lhsSourceDir = "C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\Files\\lhs";
-            String rhsSourceDir = "C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\Files\\rhs";
+            String lhsSourceDir = "C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\lhs";
+            String rhsSourceDir = "C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\rhs";
 
             // Process LHS files
             List<String> lhsJavaFiles = getAllJavaFiles(new File(lhsSourceDir));
@@ -87,12 +87,12 @@ public class Main {
             
             // Output the LHS JSON
             System.out.println("LHS OUTPUT:");
-            System.out.println(lhsJsonObject.toString(2)); // Can use .getJSONArray("syntax")
+            //System.out.println(lhsJsonObject.toString(2)); // Can use .getJSONArray("syntax")
             
             // Save LHS JSON to file
-            try (FileWriter file = new FileWriter("C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\Files\\lhs.json")) {
+            try (FileWriter file = new FileWriter("C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\lhs.json")) {
                 file.write(lhsJsonObject.toString(2));
-                System.out.println("LHS JSON saved to: C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\Files\\lhs.json");
+                System.out.println("LHS JSON saved to: C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\lhs.json");
             } catch (IOException e) {
                 System.err.println("Error saving LHS JSON to file: " + e.getMessage());
             }
@@ -139,12 +139,12 @@ public class Main {
             
             // Output the RHS JSON
             System.out.println("\nRHS OUTPUT:");
-            System.out.println(rhsJsonObject.toString(2));
+            //System.out.println(rhsJsonObject.toString(2));
             
             // Save RHS JSON to file
-            try (FileWriter file = new FileWriter("C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\Files\\rhs.json")) {
+            try (FileWriter file = new FileWriter("C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\rhs.json")) {
                 file.write(rhsJsonObject.toString(2));
-                System.out.println("RHS JSON saved to: C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\Files\\rhs.json");
+                System.out.println("RHS JSON saved to: C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\rhs.json");
             } catch (IOException e) {
                 System.err.println("Error saving RHS JSON to file: " + e.getMessage());
             }
