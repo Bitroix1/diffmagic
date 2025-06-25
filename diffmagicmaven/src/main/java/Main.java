@@ -33,13 +33,11 @@ public class Main {
 
     static class FileDetails {
         String fileName;
-        Map<String, Object> tree;
         List<Edge> nameResEdges;
         Map<String, Object> syntax;
 
-        public FileDetails(String fileName, Map<String, Object> tree, List<Edge> nameResEdges, Map<String, Object> syntax) {
+        public FileDetails(String fileName, List<Edge> nameResEdges, Map<String, Object> syntax) {
             this.fileName = fileName;
-            this.tree = tree;
             this.nameResEdges = nameResEdges;
             this.syntax = syntax;
         }
@@ -53,116 +51,104 @@ public class Main {
 
             // Process LHS files
             List<String> lhsJavaFiles = getAllJavaFiles(new File(lhsSourceDir));
-            List<FileDetails> lhsFilesDetails = processFiles(lhsJavaFiles, null, null, 1);
-            
+            List<FileDetails> lhsFilesDetails = processFiles(lhsJavaFiles, 1);
+
             // Output LHS data
             Map<String, Object> lhsOutput = new HashMap<>();
-            List<Map<String, Object>> lhsTrees = new ArrayList<>();
+            
             List<Edge> lhsNameResEdges = new ArrayList<>();
-            List<Map<String, Object>> lhsSyntaxes = new ArrayList<>();
-            
+            Map<String, Object> lhsSyntaxes = new HashMap<>();
+
+            // Collect data from processed files
             for (FileDetails fileDetails : lhsFilesDetails) {
-                lhsTrees.add(fileDetails.tree);
                 lhsNameResEdges.addAll(fileDetails.nameResEdges);
-                lhsSyntaxes.add(fileDetails.syntax);
+                
+                String fileName = new File(fileDetails.fileName).getName();
+                lhsSyntaxes.put(fileName, fileDetails.syntax);
             }
-            
+
             lhsOutput.put("nameResEdges", lhsNameResEdges);
-            lhsOutput.put("trees", lhsTrees);
             lhsOutput.put("syntax", lhsSyntaxes);
-            
+
             // Convert LHS to JSON with pretty printing
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
             String lhsJsonStr = gson.toJson(lhsOutput);
-            
-            // Convert to JSONObject for content_id processing
-            JSONObject lhsJsonObject = new JSONObject(lhsJsonStr);
-            
-            // Update num_descendants values in the syntax tree
-            JsonTraverser.updateNumDescendants(lhsJsonObject);
-            
-            // Generate and add syntax info
-            JSONArray lhsSyntaxInfo = JsonTraverser.generateSyntaxInfo(lhsJsonObject);
-            lhsJsonObject.put("syntaxInfo", lhsSyntaxInfo);
-            
+
             // Output the LHS JSON
             System.out.println("LHS OUTPUT:");
-            //System.out.println(lhsJsonObject.toString(2)); // Can use .getJSONArray("syntax")
-            
+            System.out.println(lhsJsonStr);
+
             // Save LHS JSON to file
             try (FileWriter file = new FileWriter("C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\lhs.json")) {
-                file.write(lhsJsonObject.toString(2));
+                file.write(lhsJsonStr);
                 System.out.println("LHS JSON saved to: C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\lhs.json");
             } catch (IOException e) {
                 System.err.println("Error saving LHS JSON to file: " + e.getMessage());
             }
-            
-            // Get the last uniqueId used for LHS processing
-            int lastLhsUniqueId = SyntaxVisitor.getLastUniqueId();
-            
-            // Get the content ID cache and list ID cache from JsonTraverser
-            Map<String, Integer> contentIdCache = JsonTraverser.getContentIdCache();
-            Map<Integer, Integer> listIdCache = JsonTraverser.getListIdCache();
 
-            // Process RHS files, starting from last LHS uniqueId + 1
+            int lastLhsUniqueId = SyntaxVisitor.getLastUniqueId();
+
+            // Process RHS files
             List<String> rhsJavaFiles = getAllJavaFiles(new File(rhsSourceDir));
-            List<FileDetails> rhsFilesDetails = processFiles(rhsJavaFiles, contentIdCache, listIdCache, lastLhsUniqueId + 1);
-            
+            List<FileDetails> rhsFilesDetails = processFiles(rhsJavaFiles, lastLhsUniqueId + 1);
+
             // Output RHS data
             Map<String, Object> rhsOutput = new HashMap<>();
-            List<Map<String, Object>> rhsTrees = new ArrayList<>();
+            
             List<Edge> rhsNameResEdges = new ArrayList<>();
-            List<Map<String, Object>> rhsSyntaxes = new ArrayList<>();
-            
+            Map<String, Object> rhsSyntaxes = new HashMap<>();
+
+            // Collect data from processed files
             for (FileDetails fileDetails : rhsFilesDetails) {
-                rhsTrees.add(fileDetails.tree);
                 rhsNameResEdges.addAll(fileDetails.nameResEdges);
-                rhsSyntaxes.add(fileDetails.syntax);
+                
+                String fileName = new File(fileDetails.fileName).getName();
+                rhsSyntaxes.put(fileName, fileDetails.syntax);
             }
-            
+
             rhsOutput.put("nameResEdges", rhsNameResEdges);
-            rhsOutput.put("trees", rhsTrees);
             rhsOutput.put("syntax", rhsSyntaxes);
-            
+
             // Convert RHS to JSON with pretty printing
             String rhsJsonStr = gson.toJson(rhsOutput);
-            
-            // Convert to JSONObject for content_id processing
-            JSONObject rhsJsonObject = new JSONObject(rhsJsonStr);
-            
-            // Update num_descendants values in the syntax tree
-            JsonTraverser.updateNumDescendants(rhsJsonObject);
-            
-            // Generate and add syntax info
-            JSONArray rhsSyntaxInfo = JsonTraverser.generateSyntaxInfo(rhsJsonObject);
-            rhsJsonObject.put("syntaxInfo", rhsSyntaxInfo);
-            
+
             // Output the RHS JSON
-            System.out.println("\nRHS OUTPUT:");
-            //System.out.println(rhsJsonObject.toString(2));
-            
+            System.out.println("RHS OUTPUT:");
+            System.out.println(rhsJsonStr);
+
             // Save RHS JSON to file
             try (FileWriter file = new FileWriter("C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\rhs.json")) {
-                file.write(rhsJsonObject.toString(2));
+                file.write(rhsJsonStr);
                 System.out.println("RHS JSON saved to: C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\rhs.json");
             } catch (IOException e) {
                 System.err.println("Error saving RHS JSON to file: " + e.getMessage());
             }
-            
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
+    
+    // Recursively collect all .java files in a directory
+    public static List<String> getAllJavaFiles(File directory) {
+        List<String> javaFiles = new ArrayList<>();
+        for (File file : directory.listFiles()) {
+            if (file.isDirectory()) {
+                javaFiles.addAll(getAllJavaFiles(file));
+            } else if (file.getName().endsWith(".java")) {
+                javaFiles.add(file.getAbsolutePath());
+            }
+        }
+        return javaFiles;
+    }
+    
     // Helper method to process files
     private static List<FileDetails> processFiles(
-            List<String> javaFiles, 
-            Map<String, Integer> contentIdCache,
-            Map<Integer, Integer> listIdCache, // Add this parameter
+            List<String> javaFiles,
             int startUniqueId) throws Exception {
         List<FileDetails> filesDetails = new ArrayList<>();
         List<char[]> sources = new ArrayList<>();
-        
+
         for (String filePath : javaFiles) {
             sources.add(new String(Files.readAllBytes(Paths.get(filePath))).toCharArray());
         }
@@ -171,10 +157,7 @@ public class Main {
         String[] classpathEntries = { System.getProperty("java.home") + "\\lib\\rt.jar" };
         String[] sourcepathEntries = { new File(javaFiles.get(0)).getParent() };
 
-        // Set the starting uniqueId for SyntaxVisitor
-        if (startUniqueId > 1) {
-            SyntaxVisitor.setStartingUniqueId(startUniqueId);
-        }
+        SyntaxVisitor.setStartingUniqueId(startUniqueId);
 
         for (int i = 0; i < javaFiles.size(); i++) {
             String filePath = javaFiles.get(i);
@@ -190,16 +173,16 @@ public class Main {
             parser.setSource(source);
 
             CompilationUnit compilationUnit = (CompilationUnit) parser.createAST(null);
-            List<Edge> nameResEdges = new ArrayList<>();
-
+            
             // Visit the AST to collect bindings
+            List<Edge> nameResEdges = new ArrayList<>();
             compilationUnit.accept(new ASTVisitor() {
                 @Override
                 public boolean visit(SimpleName node) {
                     IBinding binding = node.resolveBinding();
                     String usageId = JsonVisitor.generateId(node);
                     int usageIdNum = node.hashCode();
-                    
+
                     if (binding != null) {
                         String defId = binding.getKey();
                         int defIdNum = 0;
@@ -218,41 +201,19 @@ public class Main {
                     return super.visit(node);
                 }
             });
-            
+
             // Start node- default should be compilationUnit
             CompilationUnit root = compilationUnit;
-            
-            JsonVisitor jsonVisitor = new JsonVisitor(compilationUnit);
-            root.accept(jsonVisitor);
-            Map<String, Object> tree = jsonVisitor.jsonMap;
-            
+
             // Create SyntaxVisitor with the content ID cache if available
             SyntaxVisitor syntaxVisitor;
-            if (contentIdCache != null) {
-                syntaxVisitor = new SyntaxVisitor(compilationUnit, source, contentIdCache, listIdCache);
-            } else {
-                syntaxVisitor = new SyntaxVisitor(compilationUnit, source);
-            }
-            
+            syntaxVisitor = new SyntaxVisitor(compilationUnit, source);
             root.accept(syntaxVisitor);
             Map<String, Object> syntax = syntaxVisitor.syntaxMap;
-            
-            filesDetails.add(new FileDetails(filePath, tree, nameResEdges, syntax));
+
+            filesDetails.add(new FileDetails(filePath, nameResEdges, syntax));
         }
 
         return filesDetails;
-    }
-
-    // Recursively collect all .java files in a directory
-    public static List<String> getAllJavaFiles(File directory) {
-        List<String> javaFiles = new ArrayList<>();
-        for (File file : directory.listFiles()) {
-            if (file.isDirectory()) {
-                javaFiles.addAll(getAllJavaFiles(file));
-            } else if (file.getName().endsWith(".java")) {
-                javaFiles.add(file.getAbsolutePath());
-            }
-        }
-        return javaFiles;
     }
 }
