@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 
 public class Main {
+    // Base directory for input/output files
+    private static final String BASE_DIR = "..\\..\\difftastic\\Files\\";
 
     // Edges in the name resolution graph
     static class Edge {
@@ -45,9 +47,11 @@ public class Main {
 
     public static void main(String[] args) {
         try {
+            File base = new File(BASE_DIR);
+            System.out.println("Base absolute path: " + base.getAbsolutePath());
             // Two directories for LHS and RHS comparison
-            String lhsSourceDir = "C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\lhs";
-            String rhsSourceDir = "C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\rhs";
+            String lhsSourceDir = BASE_DIR + "lhs";
+            String rhsSourceDir = BASE_DIR + "rhs";
 
             // Process LHS files
             List<String> lhsJavaFiles = getAllJavaFiles(new File(lhsSourceDir));
@@ -79,9 +83,9 @@ public class Main {
             System.out.println(lhsJsonStr);
 
             // Save LHS JSON to file
-            try (FileWriter file = new FileWriter("C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\lhs.json")) {
+            try (FileWriter file = new FileWriter(BASE_DIR + "lhs.json")) {
                 file.write(lhsJsonStr);
-                System.out.println("LHS JSON saved to: C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\lhs.json");
+                System.out.println("LHS JSON saved to: " + BASE_DIR + "lhs.json");
             } catch (IOException e) {
                 System.err.println("Error saving LHS JSON to file: " + e.getMessage());
             }
@@ -117,9 +121,9 @@ public class Main {
             System.out.println(rhsJsonStr);
 
             // Save RHS JSON to file
-            try (FileWriter file = new FileWriter("C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\rhs.json")) {
+            try (FileWriter file = new FileWriter(BASE_DIR + "rhs.json")) {
                 file.write(rhsJsonStr);
-                System.out.println("RHS JSON saved to: C:\\Users\\Bitroix\\Desktop\\Technion\\Diff\\difftastic\\Files\\rhs.json");
+                System.out.println("RHS JSON saved to: " + BASE_DIR + "rhs.json");
             } catch (IOException e) {
                 System.err.println("Error saving RHS JSON to file: " + e.getMessage());
             }
