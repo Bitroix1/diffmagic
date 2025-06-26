@@ -180,7 +180,7 @@ public class Main {
                 @Override
                 public boolean visit(SimpleName node) {
                     IBinding binding = node.resolveBinding();
-                    String usageId = JsonVisitor.generateId(node);
+                    String usageId = node.getClass().getSimpleName() + "@" + node.getStartPosition();
                     int usageIdNum = node.hashCode();
 
                     if (binding != null) {

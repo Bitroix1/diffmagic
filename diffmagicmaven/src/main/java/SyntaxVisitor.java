@@ -38,30 +38,7 @@ public class SyntaxVisitor extends ASTVisitor {
             }
         }
     }
-    
-    SyntaxVisitor(CompilationUnit cu, char[] source, Map<String, Integer> externalContentIdCache, Map<Integer, Integer> externalListIdCache) {
-        this.cu = cu;
-        this.source = source;
-        
-        // Use the provided content ID cache
-        if (externalContentIdCache != null) {
-            contentIdCache = externalContentIdCache;
-            
-            // Find the highest content ID to set nextContentId
-            for (int id : externalContentIdCache.values()) {
-                if (id >= nextContentId) {
-                    nextContentId = id + 1;
-                }
-            }
-        }
-        
-        // Use the provided list ID cache
-        if (externalListIdCache != null) {
-            // Pass this to JsonTraverser
-            JsonTraverser.setListIdCache(externalListIdCache);
-        }
-    }
-    
+
     // Method to set the starting uniqueId value
     public static void setStartingUniqueId(int startId) {
         uniqueId = startId;
@@ -2101,10 +2078,10 @@ public class SyntaxVisitor extends ASTVisitor {
 		if (nodeFields != null) {
 			children.add(nodeFields);
 		}
-		Object nodeDeclarations = getListOf(node.bodyDeclarations());
-		if (nodeDeclarations != null) {
-			children.add(nodeDeclarations);
-		}
+		// Object nodeDeclarations = getListOf(node.bodyDeclarations());
+		// if (nodeDeclarations != null) {
+		// 	children.add(nodeDeclarations);
+		// }
 		Object nodeMethods = getListOf(Arrays.asList(node.getMethods()));
 		if (nodeMethods != null) {
 			children.add(nodeMethods);
