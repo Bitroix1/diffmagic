@@ -195,13 +195,12 @@ public class Main {
                             defIdNum = binding.getJavaElement().hashCode();
                         } else {
                             // Fallback to using the binding's hashCode
-                            defIdNum = binding.hashCode();
+                            defIdNum = 0; //binding.hashCode();
                         }
 
                         nameResEdges.add(new Edge(usageId, defId, usageIdNum, defIdNum));
-                    } else {
-                        nameResEdges.add(new Edge(usageId, "null", usageIdNum, -1));
                     }
+                    
                     return super.visit(node);
                 }
             });
