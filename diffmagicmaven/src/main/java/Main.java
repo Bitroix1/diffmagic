@@ -1,8 +1,6 @@
 import org.eclipse.jdt.core.dom.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -16,7 +14,7 @@ import java.util.Map;
 
 public class Main {
     // Base directory for input/output files
-    private static final String BASE_DIR = "..\\..\\difftastic\\Files\\";
+    private static final String BASE_DIR = ".." + File.separator + ".." + File.separator + "difftastic" + File.separator + "Files" + File.separator;
 
     // Edges in the name resolution graph
     static class Edge {
@@ -136,7 +134,24 @@ public class Main {
     // Recursively collect all .java files in a directory
     public static List<String> getAllJavaFiles(File directory) {
         List<String> javaFiles = new ArrayList<>();
-        for (File file : directory.listFiles()) {
+        
+        if (!directory.exists()) {
+            System.err.println("Warning: Directory does not exist: " + directory.getAbsolutePath());
+            return javaFiles;
+        }
+        
+        if (!directory.isDirectory()) {
+            System.err.println("Warning: Path is not a directory: " + directory.getAbsolutePath());
+            return javaFiles;
+        }
+        
+        File[] files = directory.listFiles();
+        if (files == null) {
+            System.err.println("Warning: Cannot access directory contents: " + directory.getAbsolutePath());
+            return javaFiles;
+        }
+        
+        for (File file : files) {
             if (file.isDirectory()) {
                 javaFiles.addAll(getAllJavaFiles(file));
             } else if (file.getName().endsWith(".java")) {
@@ -146,23 +161,27 @@ public class Main {
         return javaFiles;
     }
     
-    // Helper method to process files
+    // Helper method to process files with two-pass approach
     private static List<FileDetails> processFiles(
             List<String> javaFiles,
             int startUniqueId) throws Exception {
         List<FileDetails> filesDetails = new ArrayList<>();
         List<char[]> sources = new ArrayList<>();
+        List<CompilationUnit> compilationUnits = new ArrayList<>();
 
+        // Read all source files
         for (String filePath : javaFiles) {
             sources.add(new String(Files.readAllBytes(Paths.get(filePath))).toCharArray());
         }
 
         // Classpath setup
-        String[] classpathEntries = { System.getProperty("java.home") + "\\lib\\rt.jar" };
+        String[] classpathEntries = { System.getProperty("java.home") + File.separator + "lib" + File.separator + "rt.jar" };
         String[] sourcepathEntries = { new File(javaFiles.get(0)).getParent() };
 
         SyntaxVisitor.setStartingUniqueId(startUniqueId);
 
+        // FIRST PASS: Parse all compilation units
+        System.out.println("First pass: Parsing all compilation units...");
         for (int i = 0; i < javaFiles.size(); i++) {
             String filePath = javaFiles.get(i);
             char[] source = sources.get(i);
@@ -177,8 +196,19 @@ public class Main {
             parser.setSource(source);
 
             CompilationUnit compilationUnit = (CompilationUnit) parser.createAST(null);
+            compilationUnits.add(compilationUnit);
             
-            // Visit the AST to collect bindings
+            System.out.println("Parsed: " + new File(filePath).getName());
+        }
+
+        // SECOND PASS: Resolve bindings and create syntax trees
+        System.out.println("Second pass: Resolving bindings and creating syntax trees...");
+        for (int i = 0; i < javaFiles.size(); i++) {
+            String filePath = javaFiles.get(i);
+            char[] source = sources.get(i);
+            CompilationUnit compilationUnit = compilationUnits.get(i);
+            
+            // Collect name resolution edges for this compilation unit
             List<Edge> nameResEdges = new ArrayList<>();
             compilationUnit.accept(new ASTVisitor() {
                 @Override
@@ -188,33 +218,33 @@ public class Main {
                     int usageIdNum = node.hashCode();
 
                     if (binding != null) {
-                        String defId = binding.getKey();
-                        int defIdNum = 0;
+                        // Use findDeclaringNode to check if the binding resolves to a node in this compilation unit
+                        ASTNode declaringNode = compilationUnit.findDeclaringNode(binding);
+                        
+                        if (declaringNode != null) {
+                            // The binding resolves to a node in this compilation unit
+                            String defId = binding.getKey();
+                            int defIdNum = declaringNode.hashCode();
 
-                        if (binding.getJavaElement() != null) {
-                            defIdNum = binding.getJavaElement().hashCode();
+                            nameResEdges.add(new Edge(usageId, defId, usageIdNum, defIdNum));
+                            System.out.println("Added edge: " + usageId + " -> " + defId + " (defIdNum: " + defIdNum + ")");
                         } else {
-                            // Fallback to using the binding's hashCode
-                            defIdNum = 0; //binding.hashCode();
+                            // The binding does not resolve to a node in this compilation unit - skip it
+                            System.out.println("Skipped binding for " + usageId + " - not resolved in current unit");
                         }
-
-                        nameResEdges.add(new Edge(usageId, defId, usageIdNum, defIdNum));
                     }
                     
                     return super.visit(node);
                 }
             });
 
-            // Start node- default should be compilationUnit
-            CompilationUnit root = compilationUnit;
-
-            // Create SyntaxVisitor with the content ID cache if available
-            SyntaxVisitor syntaxVisitor;
-            syntaxVisitor = new SyntaxVisitor(compilationUnit, source);
-            root.accept(syntaxVisitor);
+            // Create syntax tree for this compilation unit
+            SyntaxVisitor syntaxVisitor = new SyntaxVisitor(compilationUnit, source);
+            compilationUnit.accept(syntaxVisitor);
             Map<String, Object> syntax = syntaxVisitor.syntaxMap;
 
             filesDetails.add(new FileDetails(filePath, nameResEdges, syntax));
+            System.out.println("Processed: " + new File(filePath).getName() + " (" + nameResEdges.size() + " edges)");
         }
 
         return filesDetails;
