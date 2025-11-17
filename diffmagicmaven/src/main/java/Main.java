@@ -294,6 +294,9 @@ public class Main {
             }
         }
 
+        // Create EdgeAdder with all compilation units
+        EdgeAdder edgeAdder = new EdgeAdder(compilationUnits, javaFiles);
+
         // PROCESS: Resolve bindings and create syntax trees
         System.out.println("\nProcessing parsed compilation units...");
         for (int i = 0; i < javaFiles.size(); i++) {
@@ -303,167 +306,16 @@ public class Main {
             // Read source for syntax visitor
             char[] source = new String(Files.readAllBytes(Paths.get(filePath))).toCharArray();
             
-            // Collect name resolution edges for this compilation unit
-            List<Edge> nameResEdges = new ArrayList<>();
-            compilationUnit.accept(new ASTVisitor() {
-                @Override
-                public boolean visit(SimpleName node) {
-                    IBinding binding = node.resolveBinding();
-                    String usageId = node.getClass().getSimpleName() + "@" + node.getStartPosition();
-                    int usageIdNum = node.hashCode();
-
-                    if (binding != null) {
-                        System.out.println("Processing SimpleName: '" + node.getIdentifier() + "' at position " + node.getStartPosition());
-                        System.out.println("  Binding type: " + binding.getClass().getSimpleName());
-                        System.out.println("  Binding key: " + binding.getKey());
-                        
-                        // Try to find the declaring node in the current compilation unit first
-                        ASTNode declaringNode = compilationUnit.findDeclaringNode(binding);
-                        
-                        if (declaringNode != null) {
-                            // The binding resolves to a node in this compilation unit
-                            String defId = binding.getKey();
-                            int defIdNum = declaringNode.hashCode();
-
-                            nameResEdges.add(new Edge(usageId, defId, usageIdNum, defIdNum));
-                            System.out.println("  Added local edge: " + usageId + " -> " + defId + " (defIdNum: " + defIdNum + ")");
-                        } else {
-                            // Try to find the declaring node in ALL compilation units
-                            ASTNode foundDeclaringNode = null;
-                            String foundInFile = null;
-                            
-                            for (int j = 0; j < compilationUnits.size(); j++) {
-                                CompilationUnit otherUnit = compilationUnits.get(j);
-                                foundDeclaringNode = otherUnit.findDeclaringNode(binding);
-                                if (foundDeclaringNode != null) {
-                                    foundInFile = javaFiles.get(j);
-                                    break;
-                                }
-                            }
-                            
-                            if (foundDeclaringNode != null) {
-                                // Found the binding in another compilation unit
-                                String defId = binding.getKey();
-                                int defIdNum = foundDeclaringNode.hashCode();
-
-                                nameResEdges.add(new Edge(usageId, defId, usageIdNum, defIdNum));
-                                System.out.println("  Added cross-file edge: " + usageId + " -> " + defId + " (defIdNum: " + defIdNum + ")");
-                                System.out.println("  Found in file: " + new File(foundInFile).getName());
-                            } else {
-                                // Check if this is a library binding (like System.out.println)
-                                if (binding.getKey().startsWith("Ljava/") || binding.getKey().contains("java.lang")) {
-                                    System.out.println("  Skipped library binding: " + binding.getKey());
-                                } else {
-                                    // This might be a binding that should be resolvable but isn't
-                                    System.out.println("  WARNING: Binding not resolved in any compilation unit");
-                                    System.out.println("  Binding details - Key: " + binding.getKey() + ", Kind: " + binding.getKind());
-                                    
-                                    // Still add the edge but with -1 as defIdNum to indicate unresolved
-                                    String defId = binding.getKey();
-                                    nameResEdges.add(new Edge(usageId, defId, usageIdNum, -1));
-                                    System.out.println("  Added unresolved edge: " + usageId + " -> " + defId + " (defIdNum: -1)");
-                                }
-                            }
-                        }
-                    } else {
-                        System.out.println("No binding for SimpleName: '" + node.getIdentifier() + "' at position " + node.getStartPosition());
-                    }
-                    
-                    return super.visit(node);
-                }
-            });
-
-            // Add this new visitor after the existing SimpleName visitor in processFiles
-            compilationUnit.accept(new ASTVisitor() {
-                @Override
-                public boolean visit(MethodInvocation node) {
-                    IMethodBinding methodBinding = node.resolveMethodBinding();
-                    
-                    if (methodBinding != null) {
-                        System.out.println("\nProcessing MethodInvocation: " + node.getName().getIdentifier());
-                        
-                        // Get the method declaration node
-                        ASTNode methodDeclaration = null;
-                        
-                        // Search in all compilation units for the method declaration
-                        for (int j = 0; j < compilationUnits.size(); j++) {
-                            CompilationUnit otherUnit = compilationUnits.get(j);
-                            methodDeclaration = otherUnit.findDeclaringNode(methodBinding.getMethodDeclaration());
-                            if (methodDeclaration != null) {
-                                break;
-                            }
-                        }
-                        
-                        if (methodDeclaration instanceof MethodDeclaration) {
-                            MethodDeclaration methodDecl = (MethodDeclaration) methodDeclaration;
-                            List<?> parameters = methodDecl.parameters();
-                            List<?> arguments = node.arguments();
-                            
-                            System.out.println("  Found method declaration with " + parameters.size() + " parameters");
-                            System.out.println("  Method call has " + arguments.size() + " arguments");
-                            
-                            // Match arguments to parameters by position
-                            int matchCount = Math.min(parameters.size(), arguments.size());
-                            
-                            for (int k = 0; k < matchCount; k++) {
-                                Object paramObj = parameters.get(k);
-                                Object argObj = arguments.get(k);
-                                
-                                // Extract SimpleName from parameter
-                                SimpleName paramName = null;
-                                if (paramObj instanceof SingleVariableDeclaration) {
-                                    SingleVariableDeclaration param = (SingleVariableDeclaration) paramObj;
-                                    paramName = param.getName();
-                                }
-                                
-                                // Extract SimpleName from argument (if it's a simple name reference)
-                                SimpleName argName = null;
-                                if (argObj instanceof SimpleName) {
-                                    argName = (SimpleName) argObj;
-                                } else if (argObj instanceof Expression) {
-                                    // Try to extract SimpleName from more complex expressions
-                                    Expression argExpr = (Expression) argObj;
-                                    argExpr.accept(new ASTVisitor() {
-                                        @Override
-                                        public boolean visit(SimpleName name) {
-                                            // This will visit the first SimpleName found
-                                            return false; // Don't continue traversing
-                                        }
-                                    });
-                                }
-                                
-                                // Create edge if both names exist
-                                if (paramName != null && argName != null) {
-                                    String argUsageId = argName.getClass().getSimpleName() + "@" + argName.getStartPosition();
-                                    int argUsageIdNum = argName.hashCode();
-                                    
-                                    String paramDefId = "Param:" + paramName.getIdentifier() + "@" + paramName.getStartPosition();
-                                    int paramDefIdNum = paramName.hashCode();
-                                    
-                                    nameResEdges.add(new Edge(argUsageId, paramDefId, argUsageIdNum, paramDefIdNum));
-                                    
-                                    System.out.println("  Added argument-to-parameter edge [" + k + "]: " + 
-                                                     argName.getIdentifier() + " -> " + paramName.getIdentifier());
-                                    System.out.println("    From: " + argUsageId + " (ID: " + argUsageIdNum + ")");
-                                    System.out.println("    To: " + paramDefId + " (ID: " + paramDefIdNum + ")");
-                                }
-                            }
-                        } else {
-                            System.out.println("  Method declaration not found in any compilation unit");
-                        }
-                    }
-                    
-                    return super.visit(node);
-                }
-            });
+            // Add edges for this compilation unit
+            edgeAdder.addEdgesForCompilationUnit(compilationUnit);
 
             // Create syntax tree for this compilation unit
             SyntaxVisitor syntaxVisitor = new SyntaxVisitor(compilationUnit, source);
             compilationUnit.accept(syntaxVisitor);
             Map<String, Object> syntax = syntaxVisitor.syntaxMap;
 
-            filesDetails.add(new FileDetails(filePath, nameResEdges, syntax));
-            System.out.println("Processed: " + new File(filePath).getName() + " (" + nameResEdges.size() + " edges)");
+            filesDetails.add(new FileDetails(filePath, edgeAdder.getNameResEdges(), syntax));
+            System.out.println("Processed: " + new File(filePath).getName() + " (" + edgeAdder.getNameResEdges().size() + " edges)");
         }
 
         return filesDetails;
