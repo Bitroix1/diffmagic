@@ -373,6 +373,90 @@ public class Main {
                 }
             });
 
+            // Add this new visitor after the existing SimpleName visitor in processFiles
+            compilationUnit.accept(new ASTVisitor() {
+                @Override
+                public boolean visit(MethodInvocation node) {
+                    IMethodBinding methodBinding = node.resolveMethodBinding();
+                    
+                    if (methodBinding != null) {
+                        System.out.println("\nProcessing MethodInvocation: " + node.getName().getIdentifier());
+                        
+                        // Get the method declaration node
+                        ASTNode methodDeclaration = null;
+                        
+                        // Search in all compilation units for the method declaration
+                        for (int j = 0; j < compilationUnits.size(); j++) {
+                            CompilationUnit otherUnit = compilationUnits.get(j);
+                            methodDeclaration = otherUnit.findDeclaringNode(methodBinding.getMethodDeclaration());
+                            if (methodDeclaration != null) {
+                                break;
+                            }
+                        }
+                        
+                        if (methodDeclaration instanceof MethodDeclaration) {
+                            MethodDeclaration methodDecl = (MethodDeclaration) methodDeclaration;
+                            List<?> parameters = methodDecl.parameters();
+                            List<?> arguments = node.arguments();
+                            
+                            System.out.println("  Found method declaration with " + parameters.size() + " parameters");
+                            System.out.println("  Method call has " + arguments.size() + " arguments");
+                            
+                            // Match arguments to parameters by position
+                            int matchCount = Math.min(parameters.size(), arguments.size());
+                            
+                            for (int k = 0; k < matchCount; k++) {
+                                Object paramObj = parameters.get(k);
+                                Object argObj = arguments.get(k);
+                                
+                                // Extract SimpleName from parameter
+                                SimpleName paramName = null;
+                                if (paramObj instanceof SingleVariableDeclaration) {
+                                    SingleVariableDeclaration param = (SingleVariableDeclaration) paramObj;
+                                    paramName = param.getName();
+                                }
+                                
+                                // Extract SimpleName from argument (if it's a simple name reference)
+                                SimpleName argName = null;
+                                if (argObj instanceof SimpleName) {
+                                    argName = (SimpleName) argObj;
+                                } else if (argObj instanceof Expression) {
+                                    // Try to extract SimpleName from more complex expressions
+                                    Expression argExpr = (Expression) argObj;
+                                    argExpr.accept(new ASTVisitor() {
+                                        @Override
+                                        public boolean visit(SimpleName name) {
+                                            // This will visit the first SimpleName found
+                                            return false; // Don't continue traversing
+                                        }
+                                    });
+                                }
+                                
+                                // Create edge if both names exist
+                                if (paramName != null && argName != null) {
+                                    String argUsageId = argName.getClass().getSimpleName() + "@" + argName.getStartPosition();
+                                    int argUsageIdNum = argName.hashCode();
+                                    
+                                    String paramDefId = "Param:" + paramName.getIdentifier() + "@" + paramName.getStartPosition();
+                                    int paramDefIdNum = paramName.hashCode();
+                                    
+                                    nameResEdges.add(new Edge(argUsageId, paramDefId, argUsageIdNum, paramDefIdNum));
+                                    
+                                    System.out.println("  Added argument-to-parameter edge [" + k + "]: " + 
+                                                     argName.getIdentifier() + " -> " + paramName.getIdentifier());
+                                    System.out.println("    From: " + argUsageId + " (ID: " + argUsageIdNum + ")");
+                                    System.out.println("    To: " + paramDefId + " (ID: " + paramDefIdNum + ")");
+                                }
+                            }
+                        } else {
+                            System.out.println("  Method declaration not found in any compilation unit");
+                        }
+                    }
+                    
+                    return super.visit(node);
+                }
+            });
+
             // Create syntax tree for this compilation unit
             SyntaxVisitor syntaxVisitor = new SyntaxVisitor(compilationUnit, source);
             compilationUnit.accept(syntaxVisitor);
