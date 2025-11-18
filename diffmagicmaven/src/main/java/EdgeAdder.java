@@ -19,7 +19,7 @@ public class EdgeAdder {
     }
     
     public void addEdgesForCompilationUnit(CompilationUnit compilationUnit) {
-        // Add SimpleName visitor
+        // Default SimpleName visitor
         compilationUnit.accept(new ASTVisitor() {
             @Override
             public boolean visit(SimpleName node) {
@@ -88,7 +88,7 @@ public class EdgeAdder {
             }
         });
 
-        // Add MethodInvocation visitor
+        // Argument to Parameter visitor
         compilationUnit.accept(new ASTVisitor() {
             @Override
             public boolean visit(MethodInvocation node) {
@@ -172,7 +172,7 @@ public class EdgeAdder {
             }
         });
 
-        // Add ReturnStatement visitor for return type matching
+        // ReturnStatement visitor for return type matching
         compilationUnit.accept(new ASTVisitor() {
             @Override
             public boolean visit(ReturnStatement node) {
@@ -276,6 +276,56 @@ public class EdgeAdder {
                         System.out.println("    From: " + returnLiteralId + " (ID: " + returnLiteralIdNum + ")");
                         System.out.println("    To: " + methodReturnTypeId + " (ID: " + methodReturnTypeIdNum + ")");
                     }
+                }
+                
+                return super.visit(node);
+            }
+        });
+
+        // MethodInvocation visitor for method name resolution
+        compilationUnit.accept(new ASTVisitor() {
+            @Override
+            public boolean visit(MethodInvocation node) {
+                SimpleName methodCallName = node.getName();
+                IMethodBinding methodBinding = node.resolveMethodBinding();
+                
+                if (methodBinding != null) {
+                    System.out.println("\nProcessing MethodInvocation name resolution: " + methodCallName.getIdentifier());
+                    
+                    // Search for the method declaration in all compilation units
+                    ASTNode methodDeclaration = null;
+                    
+                    for (int j = 0; j < compilationUnits.size(); j++) {
+                        CompilationUnit otherUnit = compilationUnits.get(j);
+                        methodDeclaration = otherUnit.findDeclaringNode(methodBinding.getMethodDeclaration());
+                        if (methodDeclaration != null) {
+                            break;
+                        }
+                    }
+                    
+                    if (methodDeclaration instanceof MethodDeclaration) {
+                        MethodDeclaration methodDecl = (MethodDeclaration) methodDeclaration;
+                        SimpleName methodDeclName = methodDecl.getName();
+                        
+                        System.out.println("  Found method declaration: " + methodDeclName.getIdentifier());
+                        
+                        // Create edge from method call name to method declaration name
+                        String callNameId = "MethodCallName:" + methodCallName.getIdentifier() + "@" + methodCallName.getStartPosition();
+                        int callNameIdNum = methodCallName.hashCode();
+                        
+                        String declNameId = "MethodDeclName:" + methodDeclName.getIdentifier() + "@" + methodDeclName.getStartPosition();
+                        int declNameIdNum = methodDeclName.hashCode();
+                        
+                        nameResEdges.add(new Main.Edge(callNameId, declNameId, callNameIdNum, declNameIdNum));
+                        
+                        System.out.println("  Added method-call-to-declaration edge: " + callNameId + " -> " + declNameId);
+                        System.out.println("    From: " + callNameId + " (ID: " + callNameIdNum + ")");
+                        System.out.println("    To: " + declNameId + " (ID: " + declNameIdNum + ")");
+                    } else {
+                        System.out.println("  Method declaration not found (possibly library method)");
+                    }
+                } else {
+                    System.out.println("  WARNING: Could not resolve method binding for: " + methodCallName.getIdentifier());
                 }
                 
                 return super.visit(node);

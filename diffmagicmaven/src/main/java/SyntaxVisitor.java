@@ -576,6 +576,31 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ClassInstanceCreation node) {
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", "0:0-0", "", getPositionString(node.getStartPosition(), node.getLength()));
+		
+        ArrayList children = new ArrayList<>();
+		Object arguments = getListOf(node.arguments());
+		if (arguments != null) {
+			children.add(arguments);
+		}
+		Object anonymousClassDeclaration = getNodeSyntax(node.getAnonymousClassDeclaration());
+		if (anonymousClassDeclaration != null) {
+			children.add(anonymousClassDeclaration);
+		}
+		Object expression = getNodeSyntax(node.getExpression());
+		if (expression != null) {
+			children.add(expression);
+		}
+		Object nodeType = getNodeSyntax(node.getType());
+		if (nodeType != null) {
+			children.add(nodeType);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
 		return false;
 	}
 
@@ -1225,6 +1250,19 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(MarkerAnnotation node) {
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList children = new ArrayList<>();
+		Object typeName = getNodeSyntax(node.getTypeName());
+		if (typeName != null) {
+			children.add(typeName);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
 		return false;
 	}
 
