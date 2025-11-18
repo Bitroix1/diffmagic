@@ -225,7 +225,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(AnnotationTypeDeclaration node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -242,7 +242,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(AnnotationTypeMemberDeclaration node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -258,7 +258,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(AnonymousClassDeclaration node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -274,7 +274,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ArrayAccess node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -290,7 +290,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ArrayCreation node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -306,7 +306,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ArrayInitializer node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -351,7 +351,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(AssertStatement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -448,7 +448,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(BlockComment node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -487,7 +487,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(BreakStatement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -503,7 +503,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(CastExpression node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -655,7 +655,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ConditionalExpression node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -671,7 +671,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ConstructorInvocation node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -687,7 +687,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ContinueStatement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -704,7 +704,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(CreationReference node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -721,7 +721,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(Dimension node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -737,7 +737,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(DoStatement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -754,7 +754,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(EmptyStatement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -931,7 +931,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(FieldAccess node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1158,7 +1158,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(InstanceofExpression node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1175,7 +1175,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(IntersectionType node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 
@@ -1192,7 +1192,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(LabeledStatement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 
@@ -1210,7 +1210,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(LambdaExpression node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1232,7 +1232,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(LineComment node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 
@@ -1281,7 +1281,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(MemberRef node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 
@@ -1299,7 +1299,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(MemberValuePair node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 
@@ -1317,7 +1317,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(MethodRef node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 
@@ -1335,7 +1335,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(MethodRefParameter node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 
@@ -1465,7 +1465,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(NameQualifiedType node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1482,7 +1482,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(NormalAnnotation node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1605,7 +1605,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ParenthesizedExpression node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1621,7 +1621,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(PostfixExpression node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1637,7 +1637,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(PrefixExpression node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1707,7 +1707,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(QualifiedType node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1809,7 +1809,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(SingleMemberAnnotation node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 
@@ -1883,7 +1883,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(SuperConstructorInvocation node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1899,7 +1899,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(SuperFieldAccess node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1916,7 +1916,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(SuperMethodInvocation node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1933,7 +1933,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(SuperMethodReference node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1950,7 +1950,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(SwitchCase node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1966,7 +1966,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(SwitchStatement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -1982,7 +1982,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(SynchronizedStatement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 
@@ -2000,7 +2000,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(TagElement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 
@@ -2018,7 +2018,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(TextElement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 
@@ -2035,7 +2035,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ThisExpression node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -2051,7 +2051,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ThrowStatement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -2144,7 +2144,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(TypeDeclarationStatement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -2185,7 +2185,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(TypeMethodReference node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -2202,7 +2202,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(TypeParameter node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -2219,7 +2219,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.7.1
 	 */
 	public boolean visit(UnionType node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -2335,7 +2335,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(WhileStatement node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 
 	/**
@@ -2352,6 +2352,6 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(WildcardType node) {
-		return false;
+		throw new Error("Not Implemented!!!");
 	}
 }
