@@ -84,6 +84,22 @@ public class PatternMatchingVisitor extends ASTVisitor {
     }
     
     @Override
+    public boolean visit(FieldAccess fieldAccess) {
+        // Check if usageNode is the field name in a field access
+        if (fieldAccess.getName() == usageNode) {
+            // Check if this FieldAccess is on the left side of an assignment with a literal
+            ASTNode parent = fieldAccess.getParent();
+            if (parent instanceof Assignment) {
+                Assignment assignment = (Assignment) parent;
+                if (assignment.getLeftHandSide() == fieldAccess && !(assignment.getRightHandSide() instanceof SimpleName)) {
+                    handleFieldAccessLiteralAssignment(fieldAccess, assignment.getRightHandSide());
+                }
+            }
+        }
+        return true;
+    }
+    
+    @Override
     public boolean visit(ReturnStatement returnStatement) {
         // Check if the usageNode is in the return expression
         Expression returnExpression = returnStatement.getExpression();
@@ -444,6 +460,31 @@ public class PatternMatchingVisitor extends ASTVisitor {
                 
                 System.out.println("  Added initialization literal-to-type edge: " + initializer.getClass().getSimpleName() + " -> " + varType.toString());
             }
+        }
+    }
+    
+    private void handleFieldAccessLiteralAssignment(FieldAccess fieldAccess, Expression rightSide) {
+        System.out.println("  Pattern: SimpleName is a field in a literal assignment");
+        
+        IBinding fieldBinding = usageNode.resolveBinding();
+        if (!(fieldBinding instanceof IVariableBinding)) {
+            return;
+        }
+        
+        IVariableBinding varBinding = (IVariableBinding) fieldBinding;
+        ASTNode fieldDeclaration = edgeAdder.findDeclaringNodeForBinding(varBinding);
+        Type fieldType = edgeAdder.getTypeFromDeclaration(fieldDeclaration);
+        
+        if (fieldType != null) {
+            String rightLiteralId = "FieldAssignment:RightLiteral:" + rightSide.getClass().getSimpleName() + "@" + rightSide.getStartPosition();
+            int rightLiteralIdNum = rightSide.hashCode();
+            
+            String leftTypeId = "FieldAssignment:LeftFieldType:" + fieldType.toString() + "@" + fieldType.getStartPosition();
+            int leftTypeIdNum = fieldType.hashCode();
+            
+            nameResEdges.add(new Main.Edge(rightLiteralId, leftTypeId, rightLiteralIdNum, leftTypeIdNum));
+            
+            System.out.println("  Added field-assignment literal-to-type edge: " + rightSide.getClass().getSimpleName() + " -> " + fieldType.toString());
         }
     }
     
