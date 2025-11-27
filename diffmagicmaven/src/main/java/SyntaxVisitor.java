@@ -100,7 +100,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		return visitor.syntaxMap == null ? node.getClass().getSimpleName() + " IS NOT IMPLEMENTED!!!" : visitor.syntaxMap;
 	}
 	
-	private Object getListOf(List list) {
+	private Object getListOf(List<?> list) {
 		if (list == null || list.isEmpty()) {
 			return null;
 		}
@@ -326,7 +326,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object elementType = getNodeSyntax(node.getElementType());
 		if (elementType != null) {
 			children.add(elementType);
@@ -371,7 +371,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object leftHandSide = getNodeSyntax(node.getLeftHandSide());
 		if (leftHandSide != null) {
 			children.add(leftHandSide);
@@ -416,7 +416,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "{", openPosition, "}", closePosition);
 		
-		ArrayList children = new ArrayList<>();
+		ArrayList<Object> children = new ArrayList<>();
 		Object statements = getListOf(node.statements());
 		if (statements != null) {
 			children.add(statements);
@@ -523,7 +523,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "{", getPositionString(node.getStartPosition(), 1), "}", getPositionString(node.getStartPosition() + node.getLength(), 1));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeBody = getNodeSyntax(node.getBody());
 		if (nodeBody != null) {
 			children.add(nodeBody);
@@ -580,7 +580,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", "0:0-0", "", getPositionString(node.getStartPosition(), node.getLength()));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object arguments = getListOf(node.arguments());
 		if (arguments != null) {
 			children.add(arguments);
@@ -621,7 +621,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", "0:0-0", "", getPositionString(node.getStartPosition(), node.getLength()));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object packageNode = getNodeSyntax(node.getPackage());
 		if (packageNode != null) {
 			children.add(packageNode);
@@ -775,7 +775,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeBody = getNodeSyntax(node.getBody());
 		if (nodeBody != null) {
 			children.add(nodeBody);
@@ -838,7 +838,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		System.out.println("Yabba Dabba");
 		Object nodeConstants = getListOf(node.enumConstants());
 		if (nodeConstants != null) {
@@ -869,7 +869,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeName = getNodeSyntax(node.getName());
 		if (nodeName != null) {
 			children.add(nodeName);
@@ -906,7 +906,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeExpression = getNodeSyntax(node.getExpression());
 		if (nodeExpression != null) {
 			children.add(nodeExpression);
@@ -931,7 +931,24 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(FieldAccess node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+        Object nodeExpression = getNodeSyntax(node.getExpression());
+		if (nodeExpression != null) {
+			children.add(nodeExpression);
+		}
+        Object nodeName = getNodeSyntax(node.getName());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		return false;
 	}
 
 	/**
@@ -951,7 +968,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeFragments = getListOf(node.fragments());
 		if (nodeFragments != null) {
 			children.add(nodeFragments);
@@ -984,7 +1001,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeBody = getNodeSyntax(node.getBody());
 		if (nodeBody != null) {
 			children.add(nodeBody);
@@ -1021,7 +1038,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeExpression = getNodeSyntax(node.getExpression());
 		if (nodeExpression != null) {
 			children.add(nodeExpression);
@@ -1058,7 +1075,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeName = getNodeSyntax(node.getName());
 		if (nodeName != null) {
 			children.add(nodeName);
@@ -1087,7 +1104,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	    
 	    createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 	    
-	    ArrayList children = new ArrayList<>();
+	    ArrayList<Object> children = new ArrayList<>();
 		Object leftOperand = getNodeSyntax(node.getLeftOperand());
 	    if (leftOperand != null) {
 	        children.add(leftOperand);
@@ -1133,7 +1150,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		syntaxMap = new HashMap<>();
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object body = getNodeSyntax(node.getBody());
 		if (body != null) {
 			children.add(body);
@@ -1254,7 +1271,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object typeName = getNodeSyntax(node.getTypeName());
 		if (typeName != null) {
 			children.add(typeName);
@@ -1356,7 +1373,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeName = getNodeSyntax(node.getName());
 		if (nodeName != null) {
 			children.add(nodeName);
@@ -1401,7 +1418,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "(", getPositionString(node.getStartPosition(), 1), ")", getPositionString(node.getStartPosition() + node.getLength(), 1));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeName = getNodeSyntax(node.getName());
 		if (nodeName != null) {
 			children.add(nodeName);
@@ -1550,7 +1567,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeName = getNodeSyntax(node.getName());
 		if (nodeName != null) {
 			children.add(nodeName);
@@ -1580,7 +1597,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeType = getNodeSyntax(node.getType());
 		if (nodeType != null) {
 			children.add(nodeType);
@@ -1681,7 +1698,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeQualifier = getNodeSyntax(node.getQualifier());
 		if (nodeQualifier != null) {
 			children.add(nodeQualifier);
@@ -1727,7 +1744,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeExpression = getNodeSyntax(node.getExpression());
 		if (nodeExpression != null) {
 			children.add(nodeExpression);
@@ -1782,7 +1799,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeName = getNodeSyntax(node.getName());
 		if (nodeName != null) {
 			children.add(nodeName);
@@ -1830,7 +1847,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeName = getNodeSyntax(node.getName());
 		if (nodeName != null) {
 			children.add(nodeName);
@@ -1883,7 +1900,28 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(SuperConstructorInvocation node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object nodeExpression = getNodeSyntax(node.getExpression());
+		if (nodeExpression != null) {
+			children.add(nodeExpression);
+		}
+		Object arguments = getListOf(node.arguments());
+		if (arguments != null) {
+			children.add(arguments);
+		}
+		Object typeArguments = getListOf(node.typeArguments());
+		if (typeArguments != null) {
+			children.add(typeArguments);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		return false;
 	}
 
 	/**
@@ -2035,7 +2073,20 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ThisExpression node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object nodeQualifier = getNodeSyntax(node.getQualifier());
+		if (nodeQualifier != null) {
+			children.add(nodeQualifier);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		return false;
 	}
 
 	/**
@@ -2071,7 +2122,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "{", getPositionString(node.getStartPosition(), 1), "}", getPositionString(node.getStartPosition() + node.getLength(), 1));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object catchClauses = getListOf(node.catchClauses());
 		if (catchClauses != null) {
 			children.add(catchClauses);
@@ -2107,7 +2158,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "{", getPositionString(node.getStartPosition(), 1), "}", getPositionString(node.getStartPosition() + node.getLength(), 1));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeName = getNodeSyntax(node.getName());
 		if (nodeName != null) {
 			children.add(nodeName);
@@ -2239,7 +2290,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeType = getNodeSyntax(node.getType());
 		if (nodeType != null) {
 			children.add(nodeType);
@@ -2272,7 +2323,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
-        ArrayList children = new ArrayList<>();
+        ArrayList<Object> children = new ArrayList<>();
 		Object nodeType = getNodeSyntax(node.getType());
 		if (nodeType != null) {
 			children.add(nodeType);
@@ -2305,7 +2356,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	    
 	    createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 	    
-	    ArrayList children = new ArrayList<>();
+	    ArrayList<Object> children = new ArrayList<>();
 		Object nodeName = getNodeSyntax(node.getName());
 		if (nodeName != null) {
 	        children.add(nodeName);

@@ -295,7 +295,7 @@ public class Main {
         }
 
         // Create EdgeAdder with all compilation units
-        EdgeAdder edgeAdder = new EdgeAdder(compilationUnits, javaFiles);
+        EdgeAdder edgeAdder = new EdgeAdder(compilationUnits);
 
         // PROCESS: Resolve bindings and create syntax trees
         System.out.println("\nProcessing parsed compilation units...");

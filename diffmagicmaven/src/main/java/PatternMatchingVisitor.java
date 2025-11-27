@@ -1,0 +1,485 @@
+import org.eclipse.jdt.core.dom.*;
+import java.util.List;
+
+public class PatternMatchingVisitor extends ASTVisitor {
+    private SimpleName usageNode;
+    private int usageIdNum;
+    private String usageId;
+    private List<Main.Edge> nameResEdges;
+    private EdgeAdder edgeAdder;
+    
+    public PatternMatchingVisitor(SimpleName usageNode, List<Main.Edge> nameResEdges, EdgeAdder edgeAdder) {
+        this.usageNode = usageNode;
+        this.usageIdNum = usageNode.hashCode();
+        this.usageId = usageNode.getClass().getSimpleName() + ":" + usageNode.toString() + "@" + usageNode.getStartPosition();
+        this.nameResEdges = nameResEdges;
+        this.edgeAdder = edgeAdder;
+    }
+    
+    @Override
+    public boolean visit(MethodInvocation methodInvocation) {
+        // Check if the usageNode is an argument in this method invocation
+        List<?> arguments = methodInvocation.arguments();
+        for (int i = 0; i < arguments.size(); i++) {
+            Object arg = arguments.get(i);
+            // Check if the argument contains our usageNode
+            if (arg == usageNode || containsNode((ASTNode) arg, usageNode)) {
+                handleMethodArgument(methodInvocation, i);
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    @Override
+    public boolean visit(MethodDeclaration node) {
+        // Check if usageNode is the method name in a method declaration
+        if (node.getName() == usageNode) {
+            // Check if this is a constructor declaration
+            if (node.isConstructor()) {
+                handleConstructorDeclaration(node);
+            } else {
+                handleMethodDeclaration(node);
+            }
+            return false;
+        }
+        return true;
+    }
+    
+    @Override
+    public boolean visit(Assignment assignment) {
+        // Check if the usageNode is involved in this assignment
+        Expression leftSide = assignment.getLeftHandSide();
+        Expression rightSide = assignment.getRightHandSide();
+        
+        // Handle simple assignments where usageNode is on the left
+        if (leftSide == usageNode || containsNode(leftSide, usageNode)) {
+            handleAssignmentLeftSide(assignment, rightSide);
+            return false;
+        }
+        
+        // Handle assignments where usageNode is on the right
+        if (rightSide == usageNode || containsNode(rightSide, usageNode)) {
+            handleAssignmentRightSide(assignment, leftSide);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    @Override
+    public boolean visit(VariableDeclarationFragment fragment) {
+        // Check if this is a variable declaration with initialization
+        if (fragment.getName() == usageNode && fragment.getInitializer() != null) {
+            handleVariableInitialization(fragment);
+            return false;
+        } else if (fragment.getInitializer() != null && 
+                   (fragment.getInitializer() == usageNode || containsNode(fragment.getInitializer(), usageNode))) {
+            handleInitializerExpression(fragment);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    @Override
+    public boolean visit(ReturnStatement returnStatement) {
+        // Check if the usageNode is in the return expression
+        Expression returnExpression = returnStatement.getExpression();
+        if (returnExpression == usageNode || containsNode(returnExpression, usageNode)) {
+            handleReturnVariable(returnStatement);
+            return false;
+        }
+        return true;
+    }
+    
+    private boolean containsNode(ASTNode parent, ASTNode target) {
+        if (parent == null || target == null) {
+            return false;
+        }
+        if (parent == target) {
+            return true;
+        }
+        
+        // Check if target is a descendant of parent
+        final boolean[] found = new boolean[1];
+        parent.accept(new ASTVisitor() {
+            @Override
+            public void preVisit(ASTNode node) {
+                if (node == target) {
+                    found[0] = true;
+                }
+            }
+        });
+        return found[0];
+    }
+    
+    private void handleMethodArgument(MethodInvocation methodInvocation, int argumentIndex) {
+        IMethodBinding methodBinding = methodInvocation.resolveMethodBinding();
+        if (methodBinding == null) {
+            return;
+        }
+        
+        System.out.println("  Pattern: SimpleName is a method argument at position " + argumentIndex);
+        
+        ASTNode methodDeclaration = edgeAdder.findDeclaringNodeForBinding(methodBinding.getMethodDeclaration());
+        
+        if (methodDeclaration instanceof MethodDeclaration) {
+            MethodDeclaration methodDecl = (MethodDeclaration) methodDeclaration;
+            List<?> parameters = methodDecl.parameters();
+            
+            if (argumentIndex < parameters.size()) {
+                Object paramObj = parameters.get(argumentIndex);
+                if (paramObj instanceof SingleVariableDeclaration) {
+                    SingleVariableDeclaration param = (SingleVariableDeclaration) paramObj;
+                    SimpleName paramName = param.getName();
+                    
+                    String argUsageId = "ArgToParam:SimpleName:" + usageNode.toString() + "@" + usageNode.getStartPosition();
+                    String paramDefId = "ArgToParam:Param:" + paramName.getIdentifier() + "@" + paramName.getStartPosition();
+                    int paramDefIdNum = paramName.hashCode();
+                    
+                    nameResEdges.add(new Main.Edge(argUsageId, paramDefId, usageIdNum, paramDefIdNum));
+                    
+                    System.out.println("  Added argument-to-parameter edge: " + usageNode.getIdentifier() + " -> " + paramName.getIdentifier());
+                }
+            }
+        } else {
+            System.out.println("  Method declaration not found in any compilation unit");
+        }
+    }
+    
+    private void handleReturnVariable(ReturnStatement returnStatement) {
+        System.out.println("  Pattern: SimpleName is a return variable");
+        
+        // Find the enclosing method
+        ASTNode parent = returnStatement.getParent();
+        while (parent != null && !(parent instanceof MethodDeclaration)) {
+            parent = parent.getParent();
+        }
+        
+        if (parent instanceof MethodDeclaration) {
+            MethodDeclaration methodDecl = (MethodDeclaration) parent;
+            Type returnType = methodDecl.getReturnType2();
+            
+            if (returnType == null || (returnType.isPrimitiveType() && 
+                ((PrimitiveType) returnType).getPrimitiveTypeCode() == PrimitiveType.VOID)) {
+                return;
+            }
+            
+            IBinding binding = usageNode.resolveBinding();
+            if (binding instanceof IVariableBinding) {
+                IVariableBinding varBinding = (IVariableBinding) binding;
+                ASTNode varDeclaration = edgeAdder.findDeclaringNodeForBinding(varBinding);
+                
+                Type varType = edgeAdder.getTypeFromDeclaration(varDeclaration);
+                
+                if (varType != null) {
+                    String methodReturnTypeId = "ReturnVarType:MethodReturnType:" + returnType.toString() + "@" + returnType.getStartPosition();
+                    int methodReturnTypeIdNum = returnType.hashCode();
+                    
+                    String varTypeId = "ReturnVarType:VarType:" + varType.toString() + "@" + varType.getStartPosition();
+                    int varTypeIdNum = varType.hashCode();
+                    
+                    nameResEdges.add(new Main.Edge(varTypeId, methodReturnTypeId, varTypeIdNum, methodReturnTypeIdNum));
+                    
+                    System.out.println("  Added variable-type-to-method-return-type edge: " + varTypeId + " -> " + methodReturnTypeId);
+                } else {
+                    System.out.println("  WARNING: Could not find type for variable: " + usageNode.getIdentifier());
+                }
+            }
+        }
+    }
+    
+    private void handleConstructorDeclaration(MethodDeclaration constructor) {
+        System.out.println("  Pattern: SimpleName is a constructor declaration");
+        
+        // Find the enclosing type declaration
+        ASTNode parent = constructor.getParent();
+        while (parent != null && !(parent instanceof TypeDeclaration) && !(parent instanceof EnumDeclaration)) {
+            parent = parent.getParent();
+        }
+        
+        if (parent instanceof TypeDeclaration) {
+            TypeDeclaration typeDecl = (TypeDeclaration) parent;
+            SimpleName className = typeDecl.getName();
+            
+            String constructorId = "ConstructorToClass:SimpleName:" + usageNode.toString() + "@" + usageNode.getStartPosition();
+            String classNameId = "ConstructorToClass:ClassName:" + className.toString() + "@" + className.getStartPosition();
+            int classNameIdNum = className.hashCode();
+            
+            nameResEdges.add(new Main.Edge(constructorId, classNameId, usageIdNum, classNameIdNum));
+            
+            System.out.println("  Added constructor-declaration-to-class edge: " + usageNode.getIdentifier() + " -> " + className.getIdentifier());
+        } else if (parent instanceof EnumDeclaration) {
+            EnumDeclaration enumDecl = (EnumDeclaration) parent;
+            SimpleName enumName = enumDecl.getName();
+            
+            String constructorId = "ConstructorToEnum:SimpleName:" + usageNode.toString() + "@" + usageNode.getStartPosition();
+            String enumNameId = "ConstructorToEnum:EnumName:" + enumName.toString() + "@" + enumName.getStartPosition();
+            int enumNameIdNum = enumName.hashCode();
+            
+            nameResEdges.add(new Main.Edge(constructorId, enumNameId, usageIdNum, enumNameIdNum));
+            
+            System.out.println("  Added constructor-declaration-to-enum edge: " + usageNode.getIdentifier() + " -> " + enumName.getIdentifier());
+        }
+    }
+    
+    private void handleMethodDeclaration(MethodDeclaration node) {
+        IMethodBinding methodBinding = node.resolveBinding();
+        if (methodBinding == null) {
+            return;
+        }
+        
+        System.out.println("  Pattern: SimpleName is a method declaration");
+        
+        // Check if this method overrides/implements a method from a superclass/interface
+        IMethodBinding originalMethod = findOriginalMethod(methodBinding);
+        
+        if (originalMethod != null && !originalMethod.equals(methodBinding)) {
+            ASTNode originalMethodDecl = edgeAdder.findDeclaringNodeForBinding(originalMethod);
+            
+            if (originalMethodDecl instanceof MethodDeclaration) {
+                MethodDeclaration originalDecl = (MethodDeclaration) originalMethodDecl;
+                SimpleName originalName = originalDecl.getName();
+                
+                String overridingId = "OverrideMethod:SimpleName:" + usageNode.toString() + "@" + usageNode.getStartPosition();
+                String originalNameId = "OverrideMethod:OriginalMethod:" + originalName.toString() + "@" + originalName.getStartPosition();
+                int originalNameIdNum = originalName.hashCode();
+                
+                nameResEdges.add(new Main.Edge(overridingId, originalNameId, usageIdNum, originalNameIdNum));
+                
+                System.out.println("  Added overriding-method-to-original edge: " + usageNode.getIdentifier() + " -> " + originalName.getIdentifier());
+            }
+        }
+    }
+    
+    private IMethodBinding findOriginalMethod(IMethodBinding methodBinding) {
+        ITypeBinding declaringClass = methodBinding.getDeclaringClass();
+        if (declaringClass == null) {
+            return null;
+        }
+        
+        // Check superclass
+        ITypeBinding superclass = declaringClass.getSuperclass();
+        if (superclass != null) {
+            for (IMethodBinding superMethod : superclass.getDeclaredMethods()) {
+                if (methodBinding.overrides(superMethod)) {
+                    // Recursively find the original method
+                    IMethodBinding original = findOriginalMethod(superMethod);
+                    return original != null ? original : superMethod;
+                }
+            }
+        }
+        
+        // Check interfaces
+        for (ITypeBinding interfaceType : declaringClass.getInterfaces()) {
+            for (IMethodBinding interfaceMethod : interfaceType.getDeclaredMethods()) {
+                if (methodBinding.overrides(interfaceMethod)) {
+                    // Recursively find the original method
+                    IMethodBinding original = findOriginalMethod(interfaceMethod);
+                    return original != null ? original : interfaceMethod;
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    private void handleAssignmentLeftSide(Assignment assignment, Expression rightSide) {
+        System.out.println("  Pattern: SimpleName is on left side of assignment");
+        
+        IBinding binding = usageNode.resolveBinding();
+        if (binding instanceof IVariableBinding) {
+            IVariableBinding varBinding = (IVariableBinding) binding;
+            ASTNode varDeclaration = edgeAdder.findDeclaringNodeForBinding(varBinding);
+            Type leftType = edgeAdder.getTypeFromDeclaration(varDeclaration);
+            
+            if (leftType != null) {
+                if (rightSide instanceof SimpleName) {
+                    // Right side is a variable - link the two variable types
+                    SimpleName rightVar = (SimpleName) rightSide;
+                    IBinding rightBinding = rightVar.resolveBinding();
+                    
+                    if (rightBinding instanceof IVariableBinding) {
+                        IVariableBinding rightVarBinding = (IVariableBinding) rightBinding;
+                        ASTNode rightVarDeclaration = edgeAdder.findDeclaringNodeForBinding(rightVarBinding);
+                        Type rightType = edgeAdder.getTypeFromDeclaration(rightVarDeclaration);
+                        
+                        if (rightType != null) {
+                            String rightTypeId = "Assignment:RightVarType:" + rightType.toString() + "@" + rightType.getStartPosition();
+                            int rightTypeIdNum = rightType.hashCode();
+                            
+                            String leftTypeId = "Assignment:LeftVarType:" + leftType.toString() + "@" + leftType.getStartPosition();
+                            int leftTypeIdNum = leftType.hashCode();
+                            
+                            nameResEdges.add(new Main.Edge(rightTypeId, leftTypeId, rightTypeIdNum, leftTypeIdNum));
+                            
+                            System.out.println("  Added assignment variable-type edge: " + rightType.toString() + " -> " + leftType.toString());
+                        }
+                    }
+                } else {
+                    // Right side is a literal or expression - link literal to variable type
+                    String rightLiteralId = "Assignment:RightLiteral:" + rightSide.getClass().getSimpleName() + "@" + rightSide.getStartPosition();
+                    int rightLiteralIdNum = rightSide.hashCode();
+                    
+                    String leftTypeId = "Assignment:LeftVarType:" + leftType.toString() + "@" + leftType.getStartPosition();
+                    int leftTypeIdNum = leftType.hashCode();
+                    
+                    nameResEdges.add(new Main.Edge(rightLiteralId, leftTypeId, rightLiteralIdNum, leftTypeIdNum));
+                    
+                    System.out.println("  Added assignment literal-to-type edge: " + rightSide.getClass().getSimpleName() + " -> " + leftType.toString());
+                }
+            }
+        }
+    }
+    
+    private void handleAssignmentRightSide(Assignment assignment, Expression leftSide) {
+        System.out.println("  Pattern: SimpleName is on right side of assignment");
+        
+        // Get the type of the right side (usageNode)
+        IBinding rightBinding = usageNode.resolveBinding();
+        if (!(rightBinding instanceof IVariableBinding)) {
+            return;
+        }
+        
+        IVariableBinding rightVarBinding = (IVariableBinding) rightBinding;
+        ASTNode rightVarDeclaration = edgeAdder.findDeclaringNodeForBinding(rightVarBinding);
+        Type rightType = edgeAdder.getTypeFromDeclaration(rightVarDeclaration);
+        
+        if (rightType == null) {
+            return;
+        }
+        
+        // Get the type and name of the left side
+        SimpleName leftFieldName = null;
+        boolean isFieldAssignment = false;
+        
+        if (leftSide instanceof FieldAccess) {
+            leftFieldName = ((FieldAccess) leftSide).getName();
+            isFieldAssignment = true;
+        } else if (leftSide instanceof QualifiedName) {
+            leftFieldName = ((QualifiedName) leftSide).getName();
+            isFieldAssignment = true;
+        } else if (leftSide instanceof SimpleName) {
+            leftFieldName = (SimpleName) leftSide;
+        }
+        
+        if (leftFieldName == null) {
+            return;
+        }
+        
+        IBinding leftBinding = leftFieldName.resolveBinding();
+        if (!(leftBinding instanceof IVariableBinding)) {
+            return;
+        }
+        
+        IVariableBinding leftVarBinding = (IVariableBinding) leftBinding;
+        ASTNode leftVarDeclaration = edgeAdder.findDeclaringNodeForBinding(leftVarBinding);
+        Type leftType = edgeAdder.getTypeFromDeclaration(leftVarDeclaration);
+        
+        if (leftType != null) {
+            String prefix = isFieldAssignment ? "FieldAssignment:" : "Assignment:";
+            String rightTypeId = prefix + "RightVarType:" + rightType.toString() + "@" + rightType.getStartPosition();
+            int rightTypeIdNum = rightType.hashCode();
+            
+            String leftTypeId = prefix + (isFieldAssignment ? "LeftFieldType:" : "LeftVarType:") + leftType.toString() + "@" + leftType.getStartPosition();
+            int leftTypeIdNum = leftType.hashCode();
+            
+            nameResEdges.add(new Main.Edge(rightTypeId, leftTypeId, rightTypeIdNum, leftTypeIdNum));
+            
+            System.out.println("  Added " + (isFieldAssignment ? "field-" : "") + "assignment variable-type edge: " + rightType.toString() + " -> " + leftType.toString());
+        }
+    }
+    
+    private void handleVariableInitialization(VariableDeclarationFragment fragment) {
+        System.out.println("  Pattern: SimpleName is a variable being initialized");
+        
+        Expression initializer = fragment.getInitializer();
+        
+        // Get the type of the variable being declared
+        ASTNode parent = fragment.getParent();
+        Type varType = null;
+        
+        if (parent instanceof VariableDeclarationStatement) {
+            varType = ((VariableDeclarationStatement) parent).getType();
+        } else if (parent instanceof VariableDeclarationExpression) {
+            varType = ((VariableDeclarationExpression) parent).getType();
+        } else if (parent instanceof FieldDeclaration) {
+            varType = ((FieldDeclaration) parent).getType();
+        }
+        
+        if (varType != null) {
+            if (initializer instanceof SimpleName) {
+                // Initializer is a variable - link the two variable types
+                SimpleName initVar = (SimpleName) initializer;
+                IBinding initBinding = initVar.resolveBinding();
+                
+                if (initBinding instanceof IVariableBinding) {
+                    IVariableBinding initVarBinding = (IVariableBinding) initBinding;
+                    ASTNode initVarDeclaration = edgeAdder.findDeclaringNodeForBinding(initVarBinding);
+                    Type initType = edgeAdder.getTypeFromDeclaration(initVarDeclaration);
+                    
+                    if (initType != null) {
+                        String initTypeId = "VarInit:InitVarType:" + initType.toString() + "@" + initType.getStartPosition();
+                        int initTypeIdNum = initType.hashCode();
+                        
+                        String varTypeId = "VarInit:DeclVarType:" + varType.toString() + "@" + varType.getStartPosition();
+                        int varTypeIdNum = varType.hashCode();
+                        
+                        nameResEdges.add(new Main.Edge(initTypeId, varTypeId, initTypeIdNum, varTypeIdNum));
+                        
+                        System.out.println("  Added initialization variable-type edge: " + initType.toString() + " -> " + varType.toString());
+                    }
+                }
+            } else {
+                // Initializer is a literal or expression - link literal to variable type
+                String initLiteralId = "VarInit:InitLiteral:" + initializer.getClass().getSimpleName() + "@" + initializer.getStartPosition();
+                int initLiteralIdNum = initializer.hashCode();
+                
+                String varTypeId = "VarInit:DeclVarType:" + varType.toString() + "@" + varType.getStartPosition();
+                int varTypeIdNum = varType.hashCode();
+                
+                nameResEdges.add(new Main.Edge(initLiteralId, varTypeId, initLiteralIdNum, varTypeIdNum));
+                
+                System.out.println("  Added initialization literal-to-type edge: " + initializer.getClass().getSimpleName() + " -> " + varType.toString());
+            }
+        }
+    }
+    
+    private void handleInitializerExpression(VariableDeclarationFragment fragment) {
+        System.out.println("  Pattern: SimpleName is in an initializer expression");
+        
+        // This handles when usageNode is on the right side of a variable initialization
+        IBinding binding = usageNode.resolveBinding();
+        if (binding instanceof IVariableBinding) {
+            IVariableBinding varBinding = (IVariableBinding) binding;
+            ASTNode varDeclaration = edgeAdder.findDeclaringNodeForBinding(varBinding);
+            Type initType = edgeAdder.getTypeFromDeclaration(varDeclaration);
+            
+            // Get the type of the variable being declared
+            ASTNode parent = fragment.getParent();
+            Type varType = null;
+            
+            if (parent instanceof VariableDeclarationStatement) {
+                varType = ((VariableDeclarationStatement) parent).getType();
+            } else if (parent instanceof VariableDeclarationExpression) {
+                varType = ((VariableDeclarationExpression) parent).getType();
+            } else if (parent instanceof FieldDeclaration) {
+                varType = ((FieldDeclaration) parent).getType();
+            }
+            
+            if (initType != null && varType != null) {
+                String initTypeId = "VarInit:InitVarType:" + initType.toString() + "@" + initType.getStartPosition();
+                int initTypeIdNum = initType.hashCode();
+                
+                String varTypeId = "VarInit:DeclVarType:" + varType.toString() + "@" + varType.getStartPosition();
+                int varTypeIdNum = varType.hashCode();
+                
+                nameResEdges.add(new Main.Edge(initTypeId, varTypeId, initTypeIdNum, varTypeIdNum));
+                
+                System.out.println("  Added initialization variable-type edge: " + initType.toString() + " -> " + varType.toString());
+            }
+        }
+    }
+}
