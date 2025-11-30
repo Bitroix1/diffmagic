@@ -41,6 +41,12 @@ public class EdgeAdder {
             }
             
             @Override
+            public boolean visit(MethodInvocation methodInvocation) {
+                handleMethodInvocationArguments(methodInvocation);
+                return super.visit(methodInvocation);
+            }
+            
+            @Override
             public boolean visit(ReturnStatement node) {
                 // Handle literal return expressions
                 Expression returnExpression = node.getExpression();
@@ -50,6 +56,41 @@ public class EdgeAdder {
                 return super.visit(node);
             }
         });
+    }
+    
+    private void handleMethodInvocationArguments(MethodInvocation methodInvocation) {
+        // Handle all arguments in method invocation
+        IMethodBinding methodBinding = methodInvocation.resolveMethodBinding();
+        if (methodBinding == null) {
+            return;
+        }
+        
+        ASTNode methodDeclaration = findDeclaringNodeForBinding(methodBinding.getMethodDeclaration());
+        if (!(methodDeclaration instanceof MethodDeclaration)) {
+            return;
+        }
+        
+        MethodDeclaration methodDecl = (MethodDeclaration) methodDeclaration;
+        List<?> parameters = methodDecl.parameters();
+        List<?> arguments = methodInvocation.arguments();
+        
+        System.out.println("\nProcessing MethodInvocation: " + methodInvocation.getName().getIdentifier());
+        
+        for (int i = 0; i < arguments.size() && i < parameters.size(); i++) {
+            Expression argumentExpression = (Expression) arguments.get(i);
+            SingleVariableDeclaration param = (SingleVariableDeclaration) parameters.get(i);
+            
+            // Create edge from argument expression to parameter
+            String argExpressionId = "ArgToParam:Expression:" + argumentExpression.getClass().getSimpleName() + "@" + argumentExpression.getStartPosition();
+            int argExpressionIdNum = argumentExpression.hashCode();
+            
+            String paramId = "ArgToParam:Param:" + param.getName().getIdentifier() + "@" + param.getStartPosition();
+            int paramIdNum = param.hashCode();
+            
+            nameResEdges.add(new Main.Edge(argExpressionId, paramId, argExpressionIdNum, paramIdNum));
+            
+            System.out.println("  Added argument-to-parameter edge: " + argumentExpression.getClass().getSimpleName() + "@" + argumentExpression.getStartPosition() + " -> " + param.getName().getIdentifier() + "@" + param.getStartPosition());
+        }
     }
     
     ASTNode findDeclaringNodeForBinding(IBinding binding) {

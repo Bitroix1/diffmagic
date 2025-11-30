@@ -1796,15 +1796,10 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(SimpleType node) {
 		syntaxMap = new HashMap<>();
-		
-		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
-		
-        ArrayList<Object> children = new ArrayList<>();
-		Object nodeName = getNodeSyntax(node.getName());
-		if (nodeName != null) {
-			children.add(nodeName);
-		}
-        syntaxMap.put("children", children);
+		String content = node.getName().toString();
+
+		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
+		syntaxMap.put("kind", "Normal");
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
@@ -2167,14 +2162,19 @@ public class SyntaxVisitor extends ASTVisitor {
 		if (nodeFields != null) {
 			children.add(nodeFields);
 		}
-		// Object nodeDeclarations = getListOf(node.bodyDeclarations());
-		// if (nodeDeclarations != null) {
-		// 	children.add(nodeDeclarations);
-		// }
 		Object nodeMethods = getListOf(Arrays.asList(node.getMethods()));
 		if (nodeMethods != null) {
 			children.add(nodeMethods);
 		}
+		Object nodeTypes = getListOf(Arrays.asList(node.getTypes()));
+		if (nodeTypes != null) {
+			children.add(nodeTypes);
+		}
+		Object nodeSuper = getNodeSyntax(node.getSuperclassType());
+		if (nodeSuper != null) {
+			children.add(nodeSuper);
+		}
+
         syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());

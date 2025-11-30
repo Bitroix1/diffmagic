@@ -4,32 +4,14 @@ import java.util.List;
 public class PatternMatchingVisitor extends ASTVisitor {
     private SimpleName usageNode;
     private int usageIdNum;
-    private String usageId;
     private List<Main.Edge> nameResEdges;
     private EdgeAdder edgeAdder;
     
     public PatternMatchingVisitor(SimpleName usageNode, List<Main.Edge> nameResEdges, EdgeAdder edgeAdder) {
         this.usageNode = usageNode;
         this.usageIdNum = usageNode.hashCode();
-        this.usageId = usageNode.getClass().getSimpleName() + ":" + usageNode.toString() + "@" + usageNode.getStartPosition();
         this.nameResEdges = nameResEdges;
         this.edgeAdder = edgeAdder;
-    }
-    
-    @Override
-    public boolean visit(MethodInvocation methodInvocation) {
-        // Check if the usageNode is an argument in this method invocation
-        List<?> arguments = methodInvocation.arguments();
-        for (int i = 0; i < arguments.size(); i++) {
-            Object arg = arguments.get(i);
-            // Check if the argument contains our usageNode
-            if (arg == usageNode || containsNode((ASTNode) arg, usageNode)) {
-                handleMethodArgument(methodInvocation, i);
-                return false;
-            }
-        }
-        
-        return true;
     }
     
     @Override
@@ -129,40 +111,6 @@ public class PatternMatchingVisitor extends ASTVisitor {
             }
         });
         return found[0];
-    }
-    
-    private void handleMethodArgument(MethodInvocation methodInvocation, int argumentIndex) {
-        IMethodBinding methodBinding = methodInvocation.resolveMethodBinding();
-        if (methodBinding == null) {
-            return;
-        }
-        
-        System.out.println("  Pattern: SimpleName is a method argument at position " + argumentIndex);
-        
-        ASTNode methodDeclaration = edgeAdder.findDeclaringNodeForBinding(methodBinding.getMethodDeclaration());
-        
-        if (methodDeclaration instanceof MethodDeclaration) {
-            MethodDeclaration methodDecl = (MethodDeclaration) methodDeclaration;
-            List<?> parameters = methodDecl.parameters();
-            
-            if (argumentIndex < parameters.size()) {
-                Object paramObj = parameters.get(argumentIndex);
-                if (paramObj instanceof SingleVariableDeclaration) {
-                    SingleVariableDeclaration param = (SingleVariableDeclaration) paramObj;
-                    SimpleName paramName = param.getName();
-                    
-                    String argUsageId = "ArgToParam:SimpleName:" + usageNode.toString() + "@" + usageNode.getStartPosition();
-                    String paramDefId = "ArgToParam:Param:" + paramName.getIdentifier() + "@" + paramName.getStartPosition();
-                    int paramDefIdNum = paramName.hashCode();
-                    
-                    nameResEdges.add(new Main.Edge(argUsageId, paramDefId, usageIdNum, paramDefIdNum));
-                    
-                    System.out.println("  Added argument-to-parameter edge: " + usageNode.getIdentifier() + " -> " + paramName.getIdentifier());
-                }
-            }
-        } else {
-            System.out.println("  Method declaration not found in any compilation unit");
-        }
     }
     
     private void handleReturnVariable(ReturnStatement returnStatement) {
