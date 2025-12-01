@@ -80,6 +80,15 @@ public class Main {
 
             lhsOutput.put("nameResEdges", lhsNameResEdges);
             lhsOutput.put("syntax", lhsSyntaxes);
+            
+            // Assign IDs to LHS syntax trees
+            int[] idCounter = {1};
+            for (Object syntaxTree : lhsSyntaxes.values()) {
+                if (syntaxTree instanceof Map) {
+                    assignDFSIds((Map<String, Object>) syntaxTree, idCounter);
+                }
+            }
+            int lastLhsId = idCounter[0] - 1;
 
             // Convert LHS to JSON with pretty printing
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -115,6 +124,14 @@ public class Main {
 
             rhsOutput.put("nameResEdges", rhsNameResEdges);
             rhsOutput.put("syntax", rhsSyntaxes);
+            
+            // Assign IDs to RHS syntax trees, continuing from where LHS left off
+            idCounter[0] = lastLhsId + 1;
+            for (Object syntaxTree : rhsSyntaxes.values()) {
+                if (syntaxTree instanceof Map) {
+                    assignDFSIds((Map<String, Object>) syntaxTree, idCounter);
+                }
+            }
 
             // Convert RHS to JSON with pretty printing
             String rhsJsonStr = gson.toJson(rhsOutput);
@@ -127,6 +144,9 @@ public class Main {
             } catch (IOException e) {
                 System.err.println("\nError saving RHS JSON to file: " + e.getMessage());
             }
+
+            // Execute the shell script
+            executeShellScript();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -173,6 +193,41 @@ public class Main {
         // Replace system streams
         System.setOut(teeOut);
         System.setErr(teeErr);
+    }
+    
+    private static void executeShellScript() {
+        String scriptPath = "/mnt/c/Users/Bitroix/Desktop/Technion/Diff/difftastic/diffmagic.sh";
+        
+        try {
+            System.out.println("\n=== Executing Shell Script ===");
+            System.out.println("Script path: " + scriptPath);
+            
+            ProcessBuilder processBuilder = new ProcessBuilder("bash", scriptPath);
+            processBuilder.redirectErrorStream(true);
+            
+            Process process = processBuilder.start();
+            
+            // Capture and print the script output
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println("[Script] " + line);
+            }
+            
+            int exitCode = process.waitFor();
+            System.out.println("Script completed with exit code: " + exitCode);
+            
+            if (exitCode != 0) {
+                System.err.println("Warning: Script exited with non-zero status");
+            }
+        } catch (IOException e) {
+            System.err.println("Error executing shell script: " + e.getMessage());
+            System.err.println("Make sure bash is available in your PATH and the script exists");
+        } catch (InterruptedException e) {
+            System.err.println("Script execution was interrupted: " + e.getMessage());
+            Thread.currentThread().interrupt();
+        }
     }
     
     private static void saveLogAndRestore() {
@@ -319,5 +374,30 @@ public class Main {
         }
 
         return filesDetails;
+    }
+    
+    private static void assignDFSIds(Map<String, Object> node, int[] idCounter) {
+        if (node == null) {
+            return;
+        }
+        
+        // Only assign ID if not already assigned
+        if (!node.containsKey("id")) {
+            node.put("id", idCounter[0]++);
+        }
+        
+        // Recursively assign IDs to children in DFS order
+        Object childrenObj = node.get("children");
+        if (childrenObj instanceof List) {
+            List<?> children = (List<?>) childrenObj;
+            for (Object child : children) {
+                if (child instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> childMap = (Map<String, Object>) child;
+                    // Recursively process this child completely before moving to next sibling
+                    assignDFSIds(childMap, idCounter);
+                }
+            }
+        }
     }
 }

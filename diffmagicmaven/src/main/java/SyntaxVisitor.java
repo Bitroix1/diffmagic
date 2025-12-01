@@ -54,10 +54,6 @@ public class SyntaxVisitor extends ASTVisitor {
         return new HashMap<>(contentIdCache);
     }
     
-    private int getUniqueId(String content) {
-        return uniqueId++;
-    }
-    
     // Get or create a content ID for a specific content
     private int getContentId(String content) {
         if (contentIdCache.containsKey(content)) {
@@ -72,7 +68,6 @@ public class SyntaxVisitor extends ASTVisitor {
     // Create an Atom element for the syntax tree
     private void createAtom(Map<String, Object> nodeMap, String content, String position) {
         nodeMap.put("node_kind", "atom");
-        nodeMap.put("id", getUniqueId(content));
         nodeMap.put("content_id", getContentId(content));
         nodeMap.put("content", content);
         nodeMap.put("position", position);
@@ -81,7 +76,6 @@ public class SyntaxVisitor extends ASTVisitor {
     // Create a List element for the syntax tree
     private void createList(Map<String, Object> nodeMap, String openContent, String openPosition, String closeContent, String closePosition) {
         nodeMap.put("node_kind", "list");
-        nodeMap.put("id", getUniqueId(openContent));
         nodeMap.put("content_id", getContentId(openContent));
         nodeMap.put("open_content", openContent);
         nodeMap.put("open_position", openPosition);
@@ -323,18 +317,15 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(ArrayType node) {
 		syntaxMap = new HashMap<>();
-		
-		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
-		
-        ArrayList<Object> children = new ArrayList<>();
-		Object elementType = getNodeSyntax(node.getElementType());
-		if (elementType != null) {
-			children.add(elementType);
-		}
-        syntaxMap.put("children", children);
+		String content = node.getElementType().toString();
+
+		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
+		syntaxMap.put("kind", "Normal");
 		
 		syntaxMap.put("uniqueId", node.hashCode());
-
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -393,6 +384,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -417,14 +410,72 @@ public class SyntaxVisitor extends ASTVisitor {
 		createList(syntaxMap, "{", openPosition, "}", closePosition);
 		
 		ArrayList<Object> children = new ArrayList<>();
-		Object statements = getListOf(node.statements());
-		if (statements != null) {
-			children.add(statements);
-		}
-        syntaxMap.put("children", children);
 		
+		// Special handling for block - process statements and extract expressions
+		List<?> statements = node.statements();
+		if (statements != null && !statements.isEmpty()) {
+			// If there's only one statement
+			if (statements.size() == 1) {
+				Object stmt = statements.get(0);
+				if (stmt instanceof ExpressionStatement) {
+					Expression expr = ((ExpressionStatement) stmt).getExpression();
+					Object result = getNodeSyntax(expr);
+					if (result != null) {
+						children.add(result);
+					}
+				} else if (stmt instanceof ASTNode) {
+					Object result = getNodeSyntax((ASTNode) stmt);
+					if (result != null) {
+						children.add(result);
+					}
+				}
+			} else {
+				// Multiple statements - track positions and extract expressions
+				List<Object> objectList = new ArrayList<>();
+				int firstNodeStart = -1;
+				int lastNodeEnd = -1;
+				
+				for (Object stmt : statements) {
+					if (stmt instanceof ASTNode) {
+						ASTNode stmtNode = (ASTNode) stmt;
+						
+						// Track positions
+						if (firstNodeStart == -1) {
+							firstNodeStart = stmtNode.getStartPosition();
+						}
+						lastNodeEnd = stmtNode.getStartPosition() + stmtNode.getLength();
+						
+						// Extract expression if this is an ExpressionStatement
+						Object result;
+						if (stmt instanceof ExpressionStatement) {
+							Expression expr = ((ExpressionStatement) stmt).getExpression();
+							result = getNodeSyntax(expr);
+						} else {
+							result = getNodeSyntax(stmtNode);
+						}
+						
+						if (result != null) {
+							objectList.add(result);
+						}
+					}
+				}
+				
+				if (!objectList.isEmpty()) {
+					String openPos = firstNodeStart != -1 ? getPositionString(firstNodeStart, 0) : "0:0-0";
+					String closePos = lastNodeEnd != -1 ? getPositionString(lastNodeEnd, 0) : "0:0-0";
+					
+					Map<String, Object> listNode = new HashMap<>();
+					createList(listNode, "", openPos, "", closePos);
+					listNode.put("children", objectList);
+					children.add(listNode);
+				}
+			}
+		}
+		
+		syntaxMap.put("children", children);
 		syntaxMap.put("uniqueId", node.hashCode());
-
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -470,6 +521,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -536,6 +589,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -559,6 +614,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		syntaxMap.put("kind", "String(StringLiteral)");
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -601,6 +658,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -622,14 +681,33 @@ public class SyntaxVisitor extends ASTVisitor {
 		createList(syntaxMap, "", "0:0-0", "", getPositionString(node.getStartPosition(), node.getLength()));
 		
         ArrayList<Object> children = new ArrayList<>();
-		Object packageNode = getNodeSyntax(node.getPackage());
-		if (packageNode != null) {
-			children.add(packageNode);
+		// Get package name directly (not wrapped in PackageDeclaration)
+		if (node.getPackage() != null) {
+			Object packageName = getNodeSyntax(node.getPackage().getName());
+			if (packageName != null) {
+				children.add(packageName);
+			}
 		}
-		Object importsNode = getListOf(node.imports());
-		if (importsNode != null) {
-			children.add(importsNode);
+		
+		// Handle imports - unwrap if there's exactly one
+		List<?> imports = node.imports();
+		if (imports != null && !imports.isEmpty()) {
+			if (imports.size() == 1) {
+				// Single import - get the name directly
+				ImportDeclaration importDecl = (ImportDeclaration) imports.get(0);
+				Object importName = getNodeSyntax(importDecl.getName());
+				if (importName != null) {
+					children.add(importName);
+				}
+			} else {
+				// Multiple imports - use getListOf as before
+				Object importsNode = getListOf(imports);
+				if (importsNode != null) {
+					children.add(importsNode);
+				}
+			}
 		}
+		
 		Object typesNode = getListOf(node.types());
 		if (typesNode != null) {
 			children.add(typesNode);
@@ -637,6 +715,8 @@ public class SyntaxVisitor extends ASTVisitor {
         syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -792,6 +872,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -816,6 +898,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		syntaxMap.put("kind", "Normal");
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -847,6 +931,8 @@ public class SyntaxVisitor extends ASTVisitor {
         syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -886,6 +972,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -914,6 +1002,8 @@ public class SyntaxVisitor extends ASTVisitor {
         syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -948,6 +1038,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -980,6 +1072,8 @@ public class SyntaxVisitor extends ASTVisitor {
         syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -1018,6 +1112,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -1055,6 +1151,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -1071,18 +1169,9 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ImportDeclaration node) {
-		syntaxMap = new HashMap<>();
-		
-		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
-		
-        ArrayList<Object> children = new ArrayList<>();
-		Object nodeName = getNodeSyntax(node.getName());
-		if (nodeName != null) {
-			children.add(nodeName);
-		}
-        syntaxMap.put("children", children);
-		
-		syntaxMap.put("uniqueId", node.hashCode());
+		// Don't create a node for ImportDeclaration itself when called directly
+		// Just return the name
+		syntaxMap = (Map<String, Object>) getNodeSyntax(node.getName());
 		
 		return false;
 	}
@@ -1131,7 +1220,9 @@ public class SyntaxVisitor extends ASTVisitor {
 	    
 		syntaxMap.put("uniqueId", node.hashCode());
 		
-	    return false;
+	    syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -1158,6 +1249,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -1211,7 +1304,6 @@ public class SyntaxVisitor extends ASTVisitor {
 	public boolean visit(LabeledStatement node) {
 		throw new Error("Not Implemented!!!");
 	}
-
 
 	/**
 	 * Visits the given type-specific AST node.
@@ -1279,6 +1371,8 @@ public class SyntaxVisitor extends ASTVisitor {
         syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -1398,6 +1492,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -1439,6 +1535,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -1464,6 +1562,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		syntaxMap.put("kind", "Keyword");
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -1523,6 +1623,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -1547,6 +1649,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -1563,18 +1667,8 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(PackageDeclaration node) {
-		syntaxMap = new HashMap<>();
-		
-		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
-		
-        ArrayList<Object> children = new ArrayList<>();
-		Object nodeName = getNodeSyntax(node.getName());
-		if (nodeName != null) {
-			children.add(nodeName);
-		}
-        syntaxMap.put("children", children);
-		
-		syntaxMap.put("uniqueId", node.hashCode());
+		// Don't create a node for PackageDeclaration itself
+		syntaxMap = (Map<String, Object>) getNodeSyntax(node.getName());
 		
 		return false;
 	}
@@ -1605,6 +1699,8 @@ public class SyntaxVisitor extends ASTVisitor {
         syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -1678,6 +1774,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -1695,17 +1793,14 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(QualifiedName node) {
 		syntaxMap = new HashMap<>();
-		
-		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
-		
-        ArrayList<Object> children = new ArrayList<>();
-		Object nodeQualifier = getNodeSyntax(node.getQualifier());
-		if (nodeQualifier != null) {
-			children.add(nodeQualifier);
-		}
-        syntaxMap.put("children", children);
+		String content = node.getFullyQualifiedName();
+
+		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
+		syntaxMap.put("kind", "Normal");
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -1753,6 +1848,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -1778,6 +1875,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -1802,6 +1901,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		syntaxMap.put("kind", "Normal");
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -1855,6 +1956,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -1878,6 +1981,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		syntaxMap.put("kind", "String(StringLiteral)");
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -1915,6 +2020,8 @@ public class SyntaxVisitor extends ASTVisitor {
         syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -2081,6 +2188,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -2134,6 +2243,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 	/**
@@ -2179,6 +2290,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -2218,6 +2331,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		syntaxMap.put("kind", "Type");
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -2303,6 +2418,8 @@ public class SyntaxVisitor extends ASTVisitor {
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
 		return false;
 	}
 
@@ -2335,6 +2452,8 @@ public class SyntaxVisitor extends ASTVisitor {
         syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -2369,7 +2488,9 @@ public class SyntaxVisitor extends ASTVisitor {
 	    syntaxMap.put("children", children);
 	    syntaxMap.put("uniqueId", node.hashCode());
 	    
-	    return false;
+	    syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
