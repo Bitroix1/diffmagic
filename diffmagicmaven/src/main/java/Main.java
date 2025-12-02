@@ -146,7 +146,12 @@ public class Main {
             }
 
             // Execute the shell script
-            executeShellScript();
+            executeScript("Shell", "bash", "/mnt/c/Users/Bitroix/Desktop/Technion/Diff/difftastic/diffmagic.sh");
+            
+            // Execute the Python script
+            executeScript("Python", 
+                "C:\\Users\\Bitroix\\AppData\\Local\\Microsoft\\WindowsApps\\python3.13.exe",
+                "c:/Users/Bitroix/Desktop/Technion/Diff/diffmagic/novel_components.py");
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -195,14 +200,13 @@ public class Main {
         System.setErr(teeErr);
     }
     
-    private static void executeShellScript() {
-        String scriptPath = "/mnt/c/Users/Bitroix/Desktop/Technion/Diff/difftastic/diffmagic.sh";
-        
+    private static void executeScript(String scriptType, String executable, String scriptPath) {
         try {
-            System.out.println("\n=== Executing Shell Script ===");
+            System.out.println("\n=== Executing " + scriptType + " Script ===");
+            System.out.println("Executable: " + executable);
             System.out.println("Script path: " + scriptPath);
             
-            ProcessBuilder processBuilder = new ProcessBuilder("bash", scriptPath);
+            ProcessBuilder processBuilder = new ProcessBuilder(executable, scriptPath);
             processBuilder.redirectErrorStream(true);
             
             Process process = processBuilder.start();
@@ -212,20 +216,20 @@ public class Main {
                 new java.io.InputStreamReader(process.getInputStream()));
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println("[Script] " + line);
+                System.out.println("[" + scriptType + "] " + line);
             }
             
             int exitCode = process.waitFor();
-            System.out.println("Script completed with exit code: " + exitCode);
+            System.out.println(scriptType + " script completed with exit code: " + exitCode);
             
             if (exitCode != 0) {
-                System.err.println("Warning: Script exited with non-zero status");
+                System.err.println("Warning: " + scriptType + " script exited with non-zero status");
             }
         } catch (IOException e) {
-            System.err.println("Error executing shell script: " + e.getMessage());
-            System.err.println("Make sure bash is available in your PATH and the script exists");
+            System.err.println("Error executing " + scriptType + " script: " + e.getMessage());
+            System.err.println("Make sure the executable is available and the script path is correct");
         } catch (InterruptedException e) {
-            System.err.println("Script execution was interrupted: " + e.getMessage());
+            System.err.println(scriptType + " script execution was interrupted: " + e.getMessage());
             Thread.currentThread().interrupt();
         }
     }

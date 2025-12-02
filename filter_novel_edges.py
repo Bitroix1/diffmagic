@@ -1,6 +1,7 @@
 import json
 import re
-from typing import Dict, Set, List, Tuple
+from typing import Dict, Set, List
+import networkx as nx
 
 
 def parse_diff_file(diff_path: str) -> Set[int]:
@@ -63,7 +64,72 @@ def build_unique_id_to_id_mapping(syntax_tree: dict) -> Dict[int, int]:
     return mapping
 
 
-def filter_novel_edges(json_path: str, diff_path: str, output_path: str):
+def build_id_to_node_info_mapping(syntax_tree: dict) -> Dict[int, dict]:
+    """
+    Build a mapping from id to node information (content, position, nodeClass, uniqueId).
+    
+    Args:
+        syntax_tree: The syntax tree structure
+        
+    Returns:
+        Dictionary mapping id to node info
+    """
+    mapping = {}
+    
+    def traverse(node):
+        if isinstance(node, dict):
+            if 'id' in node:
+                node_id = node['id']
+                info = {
+                    'content': node.get('content', node.get('open_content', '')),
+                    'position': node.get('position', node.get('open_position', '')),
+                    'nodeClass': node.get('nodeClass', 'Unknown'),
+                    'node_kind': node.get('node_kind', 'unknown'),
+                    'uniqueId': node.get('uniqueId', -1)
+                }
+                mapping[node_id] = info
+            
+            # Recursively traverse children
+            if 'children' in node:
+                for child in node['children']:
+                    traverse(child)
+            
+            # Traverse all other dict values
+            for value in node.values():
+                if isinstance(value, (dict, list)):
+                    traverse(value)
+        elif isinstance(node, list):
+            for item in node:
+                traverse(item)
+    
+    traverse(syntax_tree)
+    return mapping
+
+
+def find_connected_components(edges: List[dict]) -> List[Set[int]]:
+    """
+    Find connected components using NetworkX.
+    
+    Args:
+        edges: List of edge dictionaries with 'fromId' and 'toId'
+        
+    Returns:
+        List of sets, where each set contains node IDs in a connected component
+    """
+    # Create an undirected graph
+    G = nx.Graph()
+    
+    # Add edges to the graph
+    for edge in edges:
+        G.add_edge(edge['fromId'], edge['toId'])
+    
+    # Find connected components
+    components = list(nx.connected_components(G))
+    
+    return components
+
+
+def filter_novel_edges(json_path: str, diff_path: str, output_path: str, source_label: str = ""):
     """
     Main function to filter edges where both endpoints are novel.
     
@@ -71,68 +137,32 @@ def filter_novel_edges(json_path: str, diff_path: str, output_path: str):
         json_path: Path to the JSON file with edges and syntax tree
         diff_path: Path to the diff text file
         output_path: Path to write the filtered edges
+        source_label: Label to identify the source (e.g., "LHS" or "RHS")
     """
     # Load JSON data
     with open(json_path, 'r') as f:
         data = json.load(f)
     
-    # Parse diff file to get novel IDs
     novel_ids = parse_diff_file(diff_path)
-    print(f"Found {len(novel_ids)} novel IDs in diff file")
-    print(f"Novel IDs (first 20): {sorted(list(novel_ids))[:20]}")
     
-    # Build mapping from uniqueId to id
     unique_id_to_id = build_unique_id_to_id_mapping(data.get('syntax', {}))
-    print(f"Built mapping with {len(unique_id_to_id)} entries")
-    print(f"Sample mappings (first 5): {dict(list(unique_id_to_id.items())[:5])}")
     
-    # Process edges
-    all_edges = []
-    edge_categories = ['nameResEdges']  # Add other edge types if they exist
-    
-    # Collect all edge types from the JSON
-    for key in data.keys():
-        if key != 'syntax' and isinstance(data[key], list):
-            edge_categories.append(key)
-    
-    edge_categories = list(set(edge_categories))  # Remove duplicates
-    
-    for edge_type in edge_categories:
-        if edge_type in data:
-            all_edges.extend(data[edge_type])
-    
-    print(f"Processing {len(all_edges)} total edges")
+    all_edges = data.get('nameResEdges', [])
     
     # Filter edges and translate IDs
     filtered_edges = []
     seen_edges = set()  # For duplicate detection
     
-    print(f"\n=== Processing Edges ===")
-    for idx, edge in enumerate(all_edges):
+    for edge in all_edges:
         from_unique_id = edge.get('fromId')
         to_unique_id = edge.get('toId')
-        
-        if idx < 5:  # Print first 5 edges for debugging
-            print(f"\nEdge {idx + 1}:")
-            print(f"  from: {edge.get('from')}")
-            print(f"  to: {edge.get('to')}")
-            print(f"  fromUniqueId: {from_unique_id}")
-            print(f"  toUniqueId: {to_unique_id}")
         
         # Translate unique IDs to incremental IDs
         from_id = unique_id_to_id.get(from_unique_id)
         to_id = unique_id_to_id.get(to_unique_id)
         
-        if idx < 5:
-            print(f"  fromId (translated): {from_id}")
-            print(f"  toId (translated): {to_id}")
-            print(f"  from is novel: {from_id in novel_ids if from_id else 'N/A'}")
-            print(f"  to is novel: {to_id in novel_ids if to_id else 'N/A'}")
-        
         # Skip if we can't find the mapping
         if from_id is None or to_id is None:
-            if idx < 5:
-                print(f"  SKIPPED: Missing ID mapping")
             continue
         
         # Check if both sides are novel
@@ -150,28 +180,117 @@ def filter_novel_edges(json_path: str, diff_path: str, output_path: str):
                     'fromUniqueId': from_unique_id,
                     'toUniqueId': to_unique_id
                 })
-                if idx < 5:
-                    print(f"  ✓ INCLUDED (both sides novel)")
-            else:
-                if idx < 5:
-                    print(f"  SKIPPED: Duplicate edge")
-        else:
-            if idx < 5:
-                print(f"  SKIPPED: Not both sides novel")
     
-    print(f"Filtered to {len(filtered_edges)} edges with both sides novel (duplicates removed)")
+    print(f"{source_label}: Filtered to {len(filtered_edges)} edges with both sides novel (duplicates removed)")
     
-    # Write output - just the edges list
+    # Build id to node info mapping
+    id_to_info = build_id_to_node_info_mapping(data.get('syntax', {}))
+    
+    components = find_connected_components(filtered_edges)
+    
+    return filtered_edges, components, id_to_info
+
+
+def components_to_json_structure(components: List[Set[int]], 
+                                 id_to_info: Dict[int, dict]) -> List[List[dict]]:
+    """
+    Convert components to JSON structure with node details.
+    
+    Args:
+        components: List of connected components (sets of node IDs)
+        id_to_info: Mapping from node ID to node information
+        
+    Returns:
+        List of components, where each component is a list of node dictionaries
+    """
+    json_components = []
+    
+    # Sort components by size (largest first)
+    sorted_components = sorted(components, key=len, reverse=True)
+    
+    for component in sorted_components:
+        component_nodes = []
+        
+        # Sort nodes in component by ID for consistent output
+        sorted_nodes = sorted(component)
+        
+        for node_id in sorted_nodes:
+            info = id_to_info.get(node_id, {})
+            
+            node_dict = {
+                'rust_id': node_id,
+                'java_id': info.get('uniqueId', -1),
+                'type': f"{info.get('nodeClass', 'Unknown')} ({info.get('node_kind', 'unknown')})",
+                'content': info.get('content', 'N/A'),
+                'position': info.get('position', 'N/A')
+            }
+            
+            component_nodes.append(node_dict)
+        
+        json_components.append(component_nodes)
+    
+    return json_components
+
+
+def combine_and_save_results(lhs_results: tuple, rhs_results: tuple, output_path: str):
+    """
+    Combine LHS and RHS results and save to files.
+    
+    Args:
+        lhs_results: Tuple of (filtered_edges, components, id_to_info) for LHS
+        rhs_results: Tuple of (filtered_edges, components, id_to_info) for RHS
+        output_path: Base path for output files
+    """
+    lhs_edges, lhs_components, lhs_id_to_info = lhs_results
+    rhs_edges, rhs_components, rhs_id_to_info = rhs_results
+    
+    # Create structured output with lhs and rhs fields
+    structured_output = {
+        'lhs': lhs_edges,
+        'rhs': rhs_edges
+    }
+    
+    # Save structured edges
     with open(output_path, 'w') as f:
-        json.dump(filtered_edges, f, indent=2)
+        json.dump(structured_output, f, indent=2)
     
-    print(f"Results written to {output_path}")
+    print(f"\nStructured filtered edges written to {output_path}")
+    print(f"  LHS edges: {len(lhs_edges)}")
+    print(f"  RHS edges: {len(rhs_edges)}")
+    print(f"  Total edges: {len(lhs_edges) + len(rhs_edges)}")
+    
+    # Create components JSON structure
+    lhs_components_json = components_to_json_structure(lhs_components, lhs_id_to_info)
+    rhs_components_json = components_to_json_structure(rhs_components, rhs_id_to_info)
+    
+    components_json_output = {
+        'lhs': lhs_components_json,
+        'rhs': rhs_components_json
+    }
+    
+    # Save components JSON
+    components_json_path = output_path.replace('.json', '_components.json')
+    with open(components_json_path, 'w') as f:
+        json.dump(components_json_output, f, indent=2)
+    
+    print(f"Components JSON written to {components_json_path}")
+    print(f"  LHS components: {len(lhs_components)}")
+    print(f"  RHS components: {len(rhs_components)}")
 
 
 if __name__ == "__main__":
-    # Example file paths - replace with actual paths
-    json_path = r"C:\Users\Bitroix\Desktop\Technion\Diff\difftastic\Files\lhs.json"
-    diff_path = r"C:\Users\Bitroix\Desktop\Technion\Diff\difftastic\Files\diff.txt"
-    output_path = r"C:\Users\Bitroix\Desktop\Technion\Diff\difftastic\Files\output.json"
+    # File paths
+    base_path = r"C:\Users\Bitroix\Desktop\Technion\Diff\difftastic\Files"
+    lhs_json_path = base_path + r"\lhs.json"
+    rhs_json_path = base_path + r"\rhs.json"
+    diff_path = base_path + r"\result.txt"
+    output_path = base_path + r"\output.json"
     
-    filter_novel_edges(json_path, diff_path, output_path)
+    # Process LHS
+    lhs_results = filter_novel_edges(lhs_json_path, diff_path, output_path, "LHS")
+    
+    # Process RHS
+    rhs_results = filter_novel_edges(rhs_json_path, diff_path, output_path, "RHS")
+    
+    # Combine and save results
+    combine_and_save_results(lhs_results, rhs_results, output_path)

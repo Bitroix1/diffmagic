@@ -410,70 +410,14 @@ public class SyntaxVisitor extends ASTVisitor {
 		createList(syntaxMap, "{", openPosition, "}", closePosition);
 		
 		ArrayList<Object> children = new ArrayList<>();
-		
-		// Special handling for block - process statements and extract expressions
-		List<?> statements = node.statements();
-		if (statements != null && !statements.isEmpty()) {
-			// If there's only one statement
-			if (statements.size() == 1) {
-				Object stmt = statements.get(0);
-				if (stmt instanceof ExpressionStatement) {
-					Expression expr = ((ExpressionStatement) stmt).getExpression();
-					Object result = getNodeSyntax(expr);
-					if (result != null) {
-						children.add(result);
-					}
-				} else if (stmt instanceof ASTNode) {
-					Object result = getNodeSyntax((ASTNode) stmt);
-					if (result != null) {
-						children.add(result);
-					}
-				}
-			} else {
-				// Multiple statements - track positions and extract expressions
-				List<Object> objectList = new ArrayList<>();
-				int firstNodeStart = -1;
-				int lastNodeEnd = -1;
-				
-				for (Object stmt : statements) {
-					if (stmt instanceof ASTNode) {
-						ASTNode stmtNode = (ASTNode) stmt;
-						
-						// Track positions
-						if (firstNodeStart == -1) {
-							firstNodeStart = stmtNode.getStartPosition();
-						}
-						lastNodeEnd = stmtNode.getStartPosition() + stmtNode.getLength();
-						
-						// Extract expression if this is an ExpressionStatement
-						Object result;
-						if (stmt instanceof ExpressionStatement) {
-							Expression expr = ((ExpressionStatement) stmt).getExpression();
-							result = getNodeSyntax(expr);
-						} else {
-							result = getNodeSyntax(stmtNode);
-						}
-						
-						if (result != null) {
-							objectList.add(result);
-						}
-					}
-				}
-				
-				if (!objectList.isEmpty()) {
-					String openPos = firstNodeStart != -1 ? getPositionString(firstNodeStart, 0) : "0:0-0";
-					String closePos = lastNodeEnd != -1 ? getPositionString(lastNodeEnd, 0) : "0:0-0";
-					
-					Map<String, Object> listNode = new HashMap<>();
-					createList(listNode, "", openPos, "", closePos);
-					listNode.put("children", objectList);
-					children.add(listNode);
-				}
-			}
+		Object nodeException = getListOf(node.statements());
+		if (nodeException != null) {
+			children.add(nodeException);
 		}
-		
 		syntaxMap.put("children", children);
+
 		syntaxMap.put("uniqueId", node.hashCode());
+
 		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
@@ -635,7 +579,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	public boolean visit(ClassInstanceCreation node) {
 		syntaxMap = new HashMap<>();
 		
-		createList(syntaxMap, "", "0:0-0", "", getPositionString(node.getStartPosition(), node.getLength()));
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
         ArrayList<Object> children = new ArrayList<>();
 		Object arguments = getListOf(node.arguments());
@@ -678,36 +622,17 @@ public class SyntaxVisitor extends ASTVisitor {
 	public boolean visit(CompilationUnit node) {
 		syntaxMap = new HashMap<>();
 		
-		createList(syntaxMap, "", "0:0-0", "", getPositionString(node.getStartPosition(), node.getLength()));
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition(), node.getLength()));
 		
-        ArrayList<Object> children = new ArrayList<>();
-		// Get package name directly (not wrapped in PackageDeclaration)
-		if (node.getPackage() != null) {
-			Object packageName = getNodeSyntax(node.getPackage().getName());
-			if (packageName != null) {
-				children.add(packageName);
-			}
+		ArrayList<Object> children = new ArrayList<>();
+        Object packageNode = getNodeSyntax(node.getPackage());
+		if (packageNode != null) {
+			children.add(packageNode);
 		}
-		
-		// Handle imports - unwrap if there's exactly one
-		List<?> imports = node.imports();
-		if (imports != null && !imports.isEmpty()) {
-			if (imports.size() == 1) {
-				// Single import - get the name directly
-				ImportDeclaration importDecl = (ImportDeclaration) imports.get(0);
-				Object importName = getNodeSyntax(importDecl.getName());
-				if (importName != null) {
-					children.add(importName);
-				}
-			} else {
-				// Multiple imports - use getListOf as before
-				Object importsNode = getListOf(imports);
-				if (importsNode != null) {
-					children.add(importsNode);
-				}
-			}
+		Object importsNode = getListOf(node.imports());
+		if (importsNode != null) {
+			children.add(importsNode);
 		}
-		
 		Object typesNode = getListOf(node.types());
 		if (typesNode != null) {
 			children.add(typesNode);
@@ -923,7 +848,6 @@ public class SyntaxVisitor extends ASTVisitor {
 		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
 		
         ArrayList<Object> children = new ArrayList<>();
-		System.out.println("Yabba Dabba");
 		Object nodeConstants = getListOf(node.enumConstants());
 		if (nodeConstants != null) {
 			children.add(nodeConstants);
@@ -1169,9 +1093,15 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ImportDeclaration node) {
-		// Don't create a node for ImportDeclaration itself when called directly
-		// Just return the name
-		syntaxMap = (Map<String, Object>) getNodeSyntax(node.getName());
+		syntaxMap = new HashMap<>();
+		String content = node.getName().toString();
+
+		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
+		syntaxMap.put("kind", "Normal");
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -1667,8 +1597,15 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(PackageDeclaration node) {
-		// Don't create a node for PackageDeclaration itself
-		syntaxMap = (Map<String, Object>) getNodeSyntax(node.getName());
+		syntaxMap = new HashMap<>();
+		String content = node.getName().toString();
+
+		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
+		syntaxMap.put("kind", "Normal");
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}
@@ -2484,8 +2421,8 @@ public class SyntaxVisitor extends ASTVisitor {
 	    if (node.getInitializer() != null) {
 	        children.add(getNodeSyntax(node.getInitializer()));
 	    }
-	    
 	    syntaxMap.put("children", children);
+
 	    syntaxMap.put("uniqueId", node.hashCode());
 	    
 	    syntaxMap.put("nodeClass", node.getClass().getSimpleName());
