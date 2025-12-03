@@ -317,10 +317,15 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(ArrayType node) {
 		syntaxMap = new HashMap<>();
-		String content = node.getElementType().toString();
-
-		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
-		syntaxMap.put("kind", "Normal");
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getElementType());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
@@ -552,7 +557,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(CharacterLiteral node) {
 		syntaxMap = new HashMap<>();
-		String content = node.getEscapedValue().toString();
+		String content = node.getEscapedValue();
 
 		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
 		syntaxMap.put("kind", "String(StringLiteral)");
@@ -817,10 +822,15 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(EnumConstantDeclaration node) {
 		syntaxMap = new HashMap<>();
-		String content = node.getName().toString();
-
-		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
-		syntaxMap.put("kind", "Normal");
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getName());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
@@ -1094,10 +1104,15 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(ImportDeclaration node) {
 		syntaxMap = new HashMap<>();
-		String content = node.getName().toString();
-
-		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
-		syntaxMap.put("kind", "Normal");
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getName());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
@@ -1598,10 +1613,15 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(PackageDeclaration node) {
 		syntaxMap = new HashMap<>();
-		String content = node.getName().toString();
-
-		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
-		syntaxMap.put("kind", "Normal");
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getName());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
@@ -1832,10 +1852,15 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(SimpleType node) {
 		syntaxMap = new HashMap<>();
-		String content = node.getName().toString();
-
-		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
-		syntaxMap.put("kind", "Normal");
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getName());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
@@ -2262,10 +2287,15 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(TypeLiteral node) {
 		syntaxMap = new HashMap<>();
-		String content = node.getType().toString();
-
-		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
-		syntaxMap.put("kind", "Type");
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getType());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		

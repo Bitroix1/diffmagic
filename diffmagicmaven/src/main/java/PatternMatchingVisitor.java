@@ -51,6 +51,26 @@ public class PatternMatchingVisitor extends ASTVisitor {
     }
     
     @Override
+    public boolean visit(MethodInvocation methodInvocation) {
+        // Check if this method invocation is being assigned to a variable
+        ASTNode parent = methodInvocation.getParent();
+        
+        if (parent instanceof Assignment) {
+            Assignment assignment = (Assignment) parent;
+            if (assignment.getRightHandSide() == methodInvocation) {
+                handleMethodInvocationAssignment(methodInvocation, assignment.getLeftHandSide());
+            }
+        } else if (parent instanceof VariableDeclarationFragment) {
+            VariableDeclarationFragment fragment = (VariableDeclarationFragment) parent;
+            if (fragment.getInitializer() == methodInvocation) {
+                handleMethodInvocationInitialization(methodInvocation, fragment);
+            }
+        }
+        
+        return true;
+    }
+    
+    @Override
     public boolean visit(VariableDeclarationFragment fragment) {
         // Add edge from fragment to its parent declaration statement
         if (fragment.getName() == usageNode) {
@@ -516,6 +536,120 @@ public class PatternMatchingVisitor extends ASTVisitor {
             nameResEdges.add(new Main.Edge(fragmentId, fieldId, fragmentIdNum, fieldIdNum));
             
             System.out.println("  Added fragment-to-field edge: " + fragment.getName().getIdentifier() + "@" + fragment.getStartPosition() + " -> FieldDeclaration@" + field.getStartPosition());
+        }
+    }
+
+    private void handleMethodInvocationAssignment(MethodInvocation methodInvocation, Expression leftSide) {
+        System.out.println("  Pattern: MethodInvocation assigned to variable");
+        
+        // Get the method binding to find the return type
+        IMethodBinding methodBinding = methodInvocation.resolveMethodBinding();
+        if (methodBinding == null) {
+            System.out.println("  WARNING: Could not resolve method binding");
+            return;
+        }
+        
+        ITypeBinding returnTypeBinding = methodBinding.getReturnType();
+        if (returnTypeBinding == null || returnTypeBinding.getName().equals("void")) {
+            return;
+        }
+        
+        // Find the method declaration to get the return type AST node
+        ASTNode methodDecl = edgeAdder.findDeclaringNodeForBinding(methodBinding);
+        if (!(methodDecl instanceof MethodDeclaration)) {
+            System.out.println("  WARNING: Could not find method declaration");
+            return;
+        }
+        
+        Type returnType = ((MethodDeclaration) methodDecl).getReturnType2();
+        if (returnType == null) {
+            return;
+        }
+        
+        // Get the variable type from the left side
+        SimpleName varName = null;
+        if (leftSide instanceof SimpleName) {
+            varName = (SimpleName) leftSide;
+        } else if (leftSide instanceof FieldAccess) {
+            varName = ((FieldAccess) leftSide).getName();
+        } else if (leftSide instanceof QualifiedName) {
+            varName = ((QualifiedName) leftSide).getName();
+        }
+        
+        if (varName == null) {
+            return;
+        }
+        
+        IBinding varBinding = varName.resolveBinding();
+        if (!(varBinding instanceof IVariableBinding)) {
+            return;
+        }
+        
+        ASTNode varDecl = edgeAdder.findDeclaringNodeForBinding(varBinding);
+        Type varType = edgeAdder.getTypeFromDeclaration(varDecl);
+        
+        if (varType != null) {
+            String returnTypeId = "MethodInvocAssign:ReturnType:" + returnType.toString() + "@" + returnType.getStartPosition();
+            int returnTypeIdNum = returnType.hashCode();
+            
+            String varTypeId = "MethodInvocAssign:VarType:" + varType.toString() + "@" + varType.getStartPosition();
+            int varTypeIdNum = varType.hashCode();
+            
+            nameResEdges.add(new Main.Edge(returnTypeId, varTypeId, returnTypeIdNum, varTypeIdNum));
+            
+            System.out.println("  Added method-return-type-to-variable-type edge: " + returnType.toString() + " -> " + varType.toString());
+        }
+    }
+    
+    private void handleMethodInvocationInitialization(MethodInvocation methodInvocation, VariableDeclarationFragment fragment) {
+        System.out.println("  Pattern: MethodInvocation used to initialize variable");
+        
+        // Get the method binding to find the return type
+        IMethodBinding methodBinding = methodInvocation.resolveMethodBinding();
+        if (methodBinding == null) {
+            System.out.println("  WARNING: Could not resolve method binding");
+            return;
+        }
+        
+        ITypeBinding returnTypeBinding = methodBinding.getReturnType();
+        if (returnTypeBinding == null || returnTypeBinding.getName().equals("void")) {
+            return;
+        }
+        
+        // Find the method declaration to get the return type AST node
+        ASTNode methodDecl = edgeAdder.findDeclaringNodeForBinding(methodBinding);
+        if (!(methodDecl instanceof MethodDeclaration)) {
+            System.out.println("  WARNING: Could not find method declaration");
+            return;
+        }
+        
+        Type returnType = ((MethodDeclaration) methodDecl).getReturnType2();
+        if (returnType == null) {
+            return;
+        }
+        
+        // Get the type of the variable being declared
+        ASTNode parent = fragment.getParent();
+        Type varType = null;
+        
+        if (parent instanceof VariableDeclarationStatement) {
+            varType = ((VariableDeclarationStatement) parent).getType();
+        } else if (parent instanceof VariableDeclarationExpression) {
+            varType = ((VariableDeclarationExpression) parent).getType();
+        } else if (parent instanceof FieldDeclaration) {
+            varType = ((FieldDeclaration) parent).getType();
+        }
+        
+        if (varType != null) {
+            String returnTypeId = "MethodInvocInit:ReturnType:" + returnType.toString() + "@" + returnType.getStartPosition();
+            int returnTypeIdNum = returnType.hashCode();
+            
+            String varTypeId = "MethodInvocInit:VarType:" + varType.toString() + "@" + varType.getStartPosition();
+            int varTypeIdNum = varType.hashCode();
+            
+            nameResEdges.add(new Main.Edge(returnTypeId, varTypeId, returnTypeIdNum, varTypeIdNum));
+            
+            System.out.println("  Added method-return-type-to-variable-type edge: " + returnType.toString() + " -> " + varType.toString());
         }
     }
 }
