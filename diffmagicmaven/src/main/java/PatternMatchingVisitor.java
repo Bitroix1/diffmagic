@@ -52,6 +52,11 @@ public class PatternMatchingVisitor extends ASTVisitor {
     
     @Override
     public boolean visit(VariableDeclarationFragment fragment) {
+        // Add edge from fragment to its parent declaration statement
+        if (fragment.getName() == usageNode) {
+            handleFragmentToDeclarationEdge(fragment);
+        }
+
         // Check if this is a variable declaration with initialization
         if (fragment.getName() == usageNode && fragment.getInitializer() != null) {
             handleVariableInitialization(fragment);
@@ -469,6 +474,48 @@ public class PatternMatchingVisitor extends ASTVisitor {
                 
                 System.out.println("  Added initialization variable-type edge: " + initType.toString() + " -> " + varType.toString());
             }
+        }
+    }
+
+    private void handleFragmentToDeclarationEdge(VariableDeclarationFragment fragment) {
+        ASTNode parent = fragment.getParent();
+        
+        if (parent instanceof VariableDeclarationStatement) {
+            VariableDeclarationStatement statement = (VariableDeclarationStatement) parent;
+            
+            String fragmentId = "FragmentToStmt:Fragment:" + fragment.getName().getIdentifier() + "@" + fragment.getStartPosition();
+            int fragmentIdNum = fragment.hashCode();
+            
+            String stmtId = "FragmentToStmt:Statement:" + statement.getClass().getSimpleName() + "@" + statement.getStartPosition();
+            int stmtIdNum = statement.hashCode();
+            
+            nameResEdges.add(new Main.Edge(fragmentId, stmtId, fragmentIdNum, stmtIdNum));
+            
+            System.out.println("  Added fragment-to-statement edge: " + fragment.getName().getIdentifier() + "@" + fragment.getStartPosition() + " -> VariableDeclarationStatement@" + statement.getStartPosition());
+        } else if (parent instanceof VariableDeclarationExpression) {
+            VariableDeclarationExpression expression = (VariableDeclarationExpression) parent;
+            
+            String fragmentId = "FragmentToExpr:Fragment:" + fragment.getName().getIdentifier() + "@" + fragment.getStartPosition();
+            int fragmentIdNum = fragment.hashCode();
+            
+            String exprId = "FragmentToExpr:Expression:" + expression.getClass().getSimpleName() + "@" + expression.getStartPosition();
+            int exprIdNum = expression.hashCode();
+            
+            nameResEdges.add(new Main.Edge(fragmentId, exprId, fragmentIdNum, exprIdNum));
+            
+            System.out.println("  Added fragment-to-expression edge: " + fragment.getName().getIdentifier() + "@" + fragment.getStartPosition() + " -> VariableDeclarationExpression@" + expression.getStartPosition());
+        } else if (parent instanceof FieldDeclaration) {
+            FieldDeclaration field = (FieldDeclaration) parent;
+            
+            String fragmentId = "FragmentToField:Fragment:" + fragment.getName().getIdentifier() + "@" + fragment.getStartPosition();
+            int fragmentIdNum = fragment.hashCode();
+            
+            String fieldId = "FragmentToField:Field:" + field.getClass().getSimpleName() + "@" + field.getStartPosition();
+            int fieldIdNum = field.hashCode();
+            
+            nameResEdges.add(new Main.Edge(fragmentId, fieldId, fragmentIdNum, fieldIdNum));
+            
+            System.out.println("  Added fragment-to-field edge: " + fragment.getName().getIdentifier() + "@" + fragment.getStartPosition() + " -> FieldDeclaration@" + field.getStartPosition());
         }
     }
 }

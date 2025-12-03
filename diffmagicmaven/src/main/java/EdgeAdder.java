@@ -159,6 +159,9 @@ public class EdgeAdder {
         }
         
         if (declaringNode != null) {
+            nameResEdges.add(new Main.Edge(usageId, "!!!" + declaringNode.toString(), usageIdNum, declaringNode.hashCode()));
+            //System.out.println("  Added SimpleName-to-SimpleName edge: " + usageId + " -> " + simpleNameDefId);
+            
             SimpleName declaringName = findDeclaringSimpleName(declaringNode, binding);
             if (declaringName != null && declaringName != node) {
                 String simpleNameDefId = "NameRes:SimpleName:" + declaringName.toString() + "@" + declaringName.getStartPosition();
