@@ -160,12 +160,12 @@ def find_largest_novel_ancestor(node_id: int,
     return largest_novel if largest_novel is not None else node_id
 
 
-def generalize_edges(edges: List[dict], 
-                    parent_map: Dict[int, int], 
-                    novel_ids: Set[int],
-                    id_to_unique_id: Dict[int, int]) -> List[dict]:
+def filter_internal_edges(edges: List[dict], 
+                          parent_map: Dict[int, int], 
+                          novel_ids: Set[int],
+                          id_to_unique_id: Dict[int, int]) -> List[dict]:
     """
-    Generalize edges to point to the largest novel ancestor instead of inner nodes.
+    Filter out edges where both endpoints are contained within the same novel ancestor node.
     
     Args:
         edges: List of edge dictionaries
@@ -174,73 +174,90 @@ def generalize_edges(edges: List[dict],
         id_to_unique_id: Mapping from id to uniqueId
         
     Returns:
-        List of generalized edges with duplicates removed
+        List of edges with internal edges removed
     """
-    generalized_edges = []
-    seen_edges = set()
-    
-    print("\n=== Generalizing Edges ===")
-    
+    filtered_edges = []
+        
     for edge in edges:
         from_id = edge['fromId']
         to_id = edge['toId']
         
         # Find largest novel ancestor for both endpoints
-        generalized_from = find_largest_novel_ancestor(from_id, parent_map, novel_ids, id_to_unique_id)
-        generalized_to = find_largest_novel_ancestor(to_id, parent_map, novel_ids, id_to_unique_id)
+        from_ancestor = find_largest_novel_ancestor(from_id, parent_map, novel_ids, id_to_unique_id)
+        to_ancestor = find_largest_novel_ancestor(to_id, parent_map, novel_ids, id_to_unique_id)
         
-        # Skip self-loops
-        if generalized_from == generalized_to:
-            print(f"  Skipped self-loop: {from_id} -> {to_id} became {generalized_from} -> {generalized_to}")
+        # Skip edges where both endpoints have the same novel ancestor (internal edges)
+        if from_ancestor == to_ancestor:
+            print(f"  Filtered internal edge: {from_id} -> {to_id} (both inside {from_ancestor})")
             continue
         
-        # Create edge tuple for duplicate detection
-        edge_tuple = (generalized_from, generalized_to)
-        
-        if edge_tuple not in seen_edges:
-            seen_edges.add(edge_tuple)
-            
-            generalized_edge = edge.copy()
-            generalized_edge['fromId'] = generalized_from
-            generalized_edge['toId'] = generalized_to
-            
-            if generalized_from != from_id or generalized_to != to_id:
-                print(f"  Generalized: {from_id} -> {to_id} became {generalized_from} -> {generalized_to}")
-            
-            generalized_edges.append(generalized_edge)
+        filtered_edges.append(edge)
     
-    return generalized_edges
+    return filtered_edges
 
 
-def find_connected_components(edges: List[dict]) -> List[Set[int]]:
+def find_connected_components(edges: List[dict]) -> List[List[dict]]:
     """
-    Find connected components using NetworkX.
+    Find connected components and return them as lists of edges.
     
     Args:
         edges: List of edge dictionaries with 'fromId' and 'toId'
         
     Returns:
-        List of sets, where each set contains node IDs in a connected component
+        List of components, where each component is a list of edge dictionaries
     """
-    # Undirected graph
+    if not edges:
+        return []
+    
+    # Build graph to find connected components
     G = nx.Graph()
     
+    # Map to store edges by their endpoints
+    edge_map = {}
     for edge in edges:
-        G.add_edge(edge['fromId'], edge['toId'])
+        from_id = edge['fromId']
+        to_id = edge['toId']
+        G.add_edge(from_id, to_id)
+        
+        # Store edge in map (both directions since graph is undirected)
+        if (from_id, to_id) not in edge_map:
+            edge_map[(from_id, to_id)] = edge
+        if (to_id, from_id) not in edge_map:
+            edge_map[(to_id, from_id)] = edge
     
-    return list(nx.connected_components(G))
+    # Find connected components as sets of nodes
+    node_components = list(nx.connected_components(G))
+    
+    # Convert node components to edge components
+    edge_components = []
+    for node_component in node_components:
+        component_edges = []
+        
+        # Find all edges within this component
+        for edge in edges:
+            from_id = edge['fromId']
+            to_id = edge['toId']
+            
+            if from_id in node_component and to_id in node_component:
+                component_edges.append(edge)
+        
+        if component_edges:
+            edge_components.append(component_edges)
+    
+    # Sort components by number of edges (largest first)
+    edge_components.sort(key=len, reverse=True)
+    
+    return edge_components
 
 
-def filter_novel_edges(json_path: str, diff_path: str, source_label: str = ""):
+def filter_novel_edges(json_path: str, diff_path: str):
     """
     Main function to filter edges where both endpoints are novel.
     
     Args:
         json_path: Path to the JSON file with edges and syntax tree
         diff_path: Path to the diff text file
-        source_label: Label to identify the source (e.g., "LHS" or "RHS")
     """
-    # Load JSON data
     with open(json_path, 'r') as f:
         data = json.load(f)
     
@@ -248,7 +265,6 @@ def filter_novel_edges(json_path: str, diff_path: str, source_label: str = ""):
     
     # Build all node mappings in one pass
     unique_id_to_id, id_to_unique_id, id_to_info = build_node_mappings(data.get('syntax', {}))
-    print(f"{source_label}: Built mappings with {len(unique_id_to_id)} nodes")
     
     edges = data.get('nameResEdges', [])
     
@@ -283,57 +299,65 @@ def filter_novel_edges(json_path: str, diff_path: str, source_label: str = ""):
                     'fromUniqueId': from_unique_id,
                     'toUniqueId': to_unique_id
                 })
-    
-    print(f"{source_label}: Filtered to {len(filtered_edges)} edges with both sides novel (duplicates removed)")
-    
-    # Mapping for generalization
+        
+    # Build parent mapping for filtering internal edges
     parent_map = build_parent_mapping(data.get('syntax', {}))
     
-    # Generalize edges to largest novel ancestors
-    generalized_edges = generalize_edges(filtered_edges, parent_map, novel_ids, id_to_unique_id)
+    # Filter out internal edges (edges within same novel ancestor)
+    external_edges = filter_internal_edges(filtered_edges, parent_map, novel_ids, id_to_unique_id)
     
-    components = find_connected_components(generalized_edges)
+    # Find connected components as lists of edges
+    components = find_connected_components(external_edges)
     
     return components, id_to_info
 
 
-def components_to_json_structure(components: List[Set[int]], 
+def components_to_json_structure(components: List[List[dict]], 
                                  id_to_info: Dict[int, dict]) -> List[List[dict]]:
     """
-    Convert components to JSON structure with node details.
+    Convert components to JSON structure with edge details.
     
     Args:
-        components: List of connected components (sets of node IDs)
+        components: List of connected components (lists of edge dictionaries)
         id_to_info: Mapping from node ID to node information
         
     Returns:
-        List of components, where each component is a list of node dictionaries
+        List of components, where each component is a list of edge dictionaries with node details
     """
     json_components = []
     
-    # Sort components by size (largest first)
-    sorted_components = sorted(components, key=len, reverse=True)
-    
-    for component in sorted_components:
-        component_nodes = []
+    for component_edges in components:
+        component_edge_list = []
         
-        # Sort nodes in component by ID for consistent output
-        sorted_nodes = sorted(component)
-        
-        for node_id in sorted_nodes:
-            info = id_to_info.get(node_id, {})
+        for edge in component_edges:
+            from_id = edge['fromId']
+            to_id = edge['toId']
             
-            node_dict = {
-                'rust_id': node_id,
-                'java_id': info.get('uniqueId', -1),
-                'type': f"{info.get('nodeClass', 'Unknown')} ({info.get('node_kind', 'unknown')})",
-                'content': info.get('content', 'N/A'),
-                'position': info.get('position', 'N/A')
+            from_info = id_to_info.get(from_id, {})
+            to_info = id_to_info.get(to_id, {})
+            
+            edge_dict = {
+                'from': {
+                    'rust_id': from_id,
+                    'java_id': from_info.get('uniqueId', -1),
+                    'type': f"{from_info.get('nodeClass', 'Unknown')} ({from_info.get('node_kind', 'unknown')})",
+                    'content': from_info.get('content', 'N/A'),
+                    'position': from_info.get('position', 'N/A')
+                },
+                'to': {
+                    'rust_id': to_id,
+                    'java_id': to_info.get('uniqueId', -1),
+                    'type': f"{to_info.get('nodeClass', 'Unknown')} ({to_info.get('node_kind', 'unknown')})",
+                    'content': to_info.get('content', 'N/A'),
+                    'position': to_info.get('position', 'N/A')
+                },
+                'edge_label': edge.get('from', ''),
+                'edge_label_full': f"{edge.get('from', '')} -> {edge.get('to', '')}"
             }
             
-            component_nodes.append(node_dict)
+            component_edge_list.append(edge_dict)
         
-        json_components.append(component_nodes)
+        json_components.append(component_edge_list)
     
     return json_components
 
@@ -360,13 +384,14 @@ def combine_and_save_results(lhs_results: tuple, rhs_results: tuple, output_path
     }
     
     # Save components JSON
-    components_json_path = output_path.replace('.json', '_components.json')
-    with open(components_json_path, 'w') as f:
+    with open(output_path, 'w') as f:
         json.dump(components_json_output, f, indent=2)
     
-    print(f"\nComponents JSON written to {components_json_path}")
+    print(f"\nComponents JSON written to {output_path}")
     print(f"  LHS components: {len(lhs_components)}")
+    print(f"  LHS total edges: {sum(len(comp) for comp in lhs_components)}")
     print(f"  RHS components: {len(rhs_components)}")
+    print(f"  RHS total edges: {sum(len(comp) for comp in rhs_components)}")
 
 
 if __name__ == "__main__":
@@ -376,8 +401,7 @@ if __name__ == "__main__":
     diff_path = base_path + r"\result.txt"
     output_path = base_path + r"\output.json"
     
-    lhs_results = filter_novel_edges(lhs_json_path, diff_path, "LHS")
-    
-    rhs_results = filter_novel_edges(rhs_json_path, diff_path, "RHS")
+    lhs_results = filter_novel_edges(lhs_json_path, diff_path)
+    rhs_results = filter_novel_edges(rhs_json_path, diff_path)
     
     combine_and_save_results(lhs_results, rhs_results, output_path)

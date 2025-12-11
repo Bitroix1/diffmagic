@@ -305,14 +305,14 @@ public class Main {
 
         // Set up compiler options
         Map<String, String> options = new HashMap<>();
-        options.put("org.eclipse.jdt.core.compiler.source", "1.8");
-        options.put("org.eclipse.jdt.core.compiler.codegen.targetPlatform", "1.8");
-        options.put("org.eclipse.jdt.core.compiler.compliance", "1.8");
+        options.put("org.eclipse.jdt.core.compiler.source", "24");
+        options.put("org.eclipse.jdt.core.compiler.codegen.targetPlatform", "24");
+        options.put("org.eclipse.jdt.core.compiler.compliance", "24");
 
         // BATCH PARSING: Parse all compilation units together
         System.out.println("\nBatch parsing all compilation units...");
         
-        ASTParser parser = ASTParser.newParser(AST.JLS8);
+        ASTParser parser = ASTParser.newParser(AST.getJLSLatest());
         parser.setKind(ASTParser.K_COMPILATION_UNIT);
         parser.setResolveBindings(true);
         parser.setBindingsRecovery(true);

@@ -10,7 +10,7 @@
     <dependency>
       <groupId>org.eclipse.jdt</groupId>
       <artifactId>org.eclipse.jdt.core</artifactId>
-      <version>3.12.2</version>
+      <version>3.44.0</version> <!-- Latest version as of 2024 - supports up to Java 23 -->
     </dependency>
     
     <!-- Dependency for Gson -->

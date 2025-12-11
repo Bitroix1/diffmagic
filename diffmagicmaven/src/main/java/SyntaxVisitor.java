@@ -219,7 +219,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(AnnotationTypeDeclaration node) {
-		throw new Error("Not Implemented!!!");
+		return false;
 	}
 
 	/**
@@ -236,7 +236,30 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(AnnotationTypeMemberDeclaration node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object nodeDefault = getNodeSyntax(node.getDefault());
+		if (nodeDefault != null) {
+			children.add(nodeDefault);
+		}
+		Object name = getNodeSyntax(node.getName());
+		if (name != null) {
+			children.add(name);
+		}
+		Object type = getNodeSyntax(node.getType());
+		if (type != null) {
+			children.add(type);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -252,7 +275,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(AnonymousClassDeclaration node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object bodyDeclarations = getListOf(node.bodyDeclarations());
+		if (bodyDeclarations != null) {
+			children.add(bodyDeclarations);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -268,7 +306,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ArrayAccess node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object array = getNodeSyntax(node.getArray());
+		if (array != null) {
+			children.add(array);
+		}
+		Object index = getNodeSyntax(node.getIndex());
+		if (index != null) {
+			children.add(index);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -284,7 +341,30 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ArrayCreation node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object dimensions = getListOf(node.dimensions());
+		if (dimensions != null) {
+			children.add(dimensions);
+		}
+		Object initializer = getNodeSyntax(node.getInitializer());
+		if (initializer != null) {
+			children.add(initializer);
+		}
+		Object type = getNodeSyntax(node.getType());
+		if (type != null) {
+			children.add(type);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -300,7 +380,23 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ArrayInitializer node) {
-		throw new Error("Not Implemented!!!");
+
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object expressions = getListOf(node.expressions());
+		if (expressions != null) {
+			children.add(expressions);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -347,7 +443,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(AssertStatement node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object expression = getNodeSyntax(node.getExpression());
+		if (expression != null) {
+			children.add(expression);
+		}
+		Object message = getNodeSyntax(node.getMessage());
+		if (message != null) {
+			children.add(message);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -380,7 +495,7 @@ public class SyntaxVisitor extends ASTVisitor {
         Map<String, Object> operatorMap = new HashMap<>();
 	    String operatorText = node.getOperator().toString();
 
-	    String operatorPosition = getPositionString(node.getLeftHandSide().getStartPosition() + node.getRightHandSide().getLength(), operatorText.length());
+	    String operatorPosition = getPositionString(node.getLeftHandSide().getStartPosition() + node.getLeftHandSide().getLength(), operatorText.length());
 	    createAtom(operatorMap, operatorText, operatorPosition);
 		syntaxMap.put("kind", "Normal");
 	    children.add(operatorMap);
@@ -448,7 +563,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(BlockComment node) {
-		throw new Error("Not Implemented!!!");
+		return false;
 	}
 
 	/**
@@ -489,7 +604,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(BreakStatement node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object label = getNodeSyntax(node.getLabel());
+		if (label != null) {
+			children.add(label);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -505,7 +635,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(CastExpression node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "{", getPositionString(node.getStartPosition(), 1), "}", getPositionString(node.getStartPosition() + node.getLength(), 1));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object expression = getNodeSyntax(node.getExpression());
+		if (expression != null) {
+			children.add(expression);
+		}
+		Object type = getNodeSyntax(node.getType());
+		if (type != null) {
+			children.add(type);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -665,7 +814,30 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ConditionalExpression node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object elseExpression = getNodeSyntax(node.getElseExpression());
+		if (elseExpression != null) {
+			children.add(elseExpression);
+		}
+		Object expression = getNodeSyntax(node.getExpression());
+		if (expression != null) {
+			children.add(expression);
+		}
+		Object thenExpression = getNodeSyntax(node.getThenExpression());
+		if (thenExpression != null) {
+			children.add(thenExpression);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -681,7 +853,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ConstructorInvocation node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object arguments = getListOf(node.arguments());
+		if (arguments != null) {
+			children.add(arguments);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -697,7 +884,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ContinueStatement node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object label = getNodeSyntax(node.getLabel());
+		if (label != null) {
+			children.add(label);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -714,7 +916,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(CreationReference node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object type = getNodeSyntax(node.getType());
+		if (type != null) {
+			children.add(type);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -731,7 +948,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(Dimension node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object annotations = getListOf(node.annotations());
+		if (annotations != null) {
+			children.add(annotations);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -747,7 +979,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(DoStatement node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object body = getNodeSyntax(node.getBody());
+		if (body != null) {
+			children.add(body);
+		}
+		Object expression = getNodeSyntax(node.getExpression());
+		if (expression != null) {
+			children.add(expression);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -764,7 +1015,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(EmptyStatement node) {
-		throw new Error("Not Implemented!!!");
+		return false;
 	}
 
 	/**
@@ -1213,7 +1464,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(InstanceofExpression node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object leftOperand = getNodeSyntax(node.getLeftOperand());
+		if (leftOperand != null) {
+			children.add(leftOperand);
+		}
+		Object rightOperand = getNodeSyntax(node.getRightOperand());
+		if (rightOperand != null) {
+			children.add(rightOperand);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -1230,7 +1500,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(IntersectionType node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object types = getListOf(node.types());
+		if (types != null) {
+			children.add(types);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 
@@ -1247,7 +1532,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(LabeledStatement node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object body = getNodeSyntax(node.getBody());
+		if (body != null) {
+			children.add(body);
+		}
+		Object label = getNodeSyntax(node.getLabel());
+		if (label != null) {
+			children.add(label);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -1264,7 +1568,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(LambdaExpression node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object parameters = getListOf(node.parameters());
+		if (parameters != null) {
+			children.add(parameters);
+		}
+		Object body = getNodeSyntax(node.getBody());
+		if (body != null) {
+			children.add(body);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -1286,7 +1609,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(LineComment node) {
-		throw new Error("Not Implemented!!!");
+		return false;
 	}
 
 
@@ -1337,7 +1660,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(MemberRef node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object name = getNodeSyntax(node.getName());
+		if (name != null) {
+			children.add(name);
+		}
+		Object qualifier = getNodeSyntax(node.getQualifier());
+		if (qualifier != null) {
+			children.add(qualifier);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 
@@ -1355,7 +1697,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(MemberValuePair node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object name = getNodeSyntax(node.getName());
+		if (name != null) {
+			children.add(name);
+		}
+		Object value = getNodeSyntax(node.getValue());
+		if (value != null) {
+			children.add(value);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 
@@ -1373,7 +1734,30 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(MethodRef node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getName());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		Object qualifier = getNodeSyntax(node.getQualifier());
+		if (qualifier != null) {
+			children.add(qualifier);
+		}
+		Object parameters = getListOf(node.parameters());
+		if (parameters != null) {
+			children.add(parameters);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 
@@ -1391,7 +1775,34 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(MethodRefParameter node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getName());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		Object type = getNodeSyntax(node.getType());
+		if (type != null) {
+			children.add(type);
+		}
+		
+		// Create atom for boolean property isVarargs
+		Map<String, Object> varargsAtom = new HashMap<>();
+		String content = String.valueOf(node.isVarargs());
+		createAtom(varargsAtom, content, getPositionString(node.getStartPosition(), content.length()));
+		varargsAtom.put("kind", "Normal");
+		children.add(varargsAtom);
+		
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 
@@ -1527,7 +1938,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(NameQualifiedType node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object name = getNodeSyntax(node.getName());
+		if (name != null) {
+			children.add(name);
+		}
+		Object qualifier = getNodeSyntax(node.getQualifier());
+		if (qualifier != null) {
+			children.add(qualifier);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -1544,7 +1974,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(NormalAnnotation node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object values = getListOf(node.values());
+		if (values != null) {
+			children.add(values);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -1675,7 +2120,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ParenthesizedExpression node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object nodeExpression = getNodeSyntax(node.getExpression());
+		if (nodeExpression != null) {
+			children.add(nodeExpression);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -1691,7 +2151,30 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(PostfixExpression node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object operand = getNodeSyntax(node.getOperand());
+		if (operand != null) {
+			children.add(operand);
+		}
+
+		// Create atom for operator
+		Map<String, Object> operatorAtom = new HashMap<>();
+		String content = node.getOperator().toString();
+		createAtom(operatorAtom, content, getPositionString(node.getStartPosition(), content.length()));
+		operatorAtom.put("kind", "Normal");
+		children.add(operatorAtom);
+				
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -1707,7 +2190,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(PrefixExpression node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object operand = getNodeSyntax(node.getOperand());
+		if (operand != null) {
+			children.add(operand);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -1776,7 +2274,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(QualifiedType node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object name = getNodeSyntax(node.getName());
+		if (name != null) {
+			children.add(name);
+		}
+		Object qualifier = getNodeSyntax(node.getQualifier());
+		if (qualifier != null) {
+			children.add(qualifier);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -1884,7 +2401,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(SingleMemberAnnotation node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object value = getNodeSyntax(node.getValue());
+		if (value != null) {
+			children.add(value);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 
@@ -2001,7 +2533,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(SuperFieldAccess node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object name = getNodeSyntax(node.getName());
+		if (name != null) {
+			children.add(name);
+		}
+		Object qualifier = getNodeSyntax(node.getQualifier());
+		if (qualifier != null) {
+			children.add(qualifier);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -2018,7 +2569,34 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(SuperMethodInvocation node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "(", getPositionString(node.getStartPosition(), 1), ")", getPositionString(node.getStartPosition() + node.getLength(), 1));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getName());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		Object arguments = getListOf(node.arguments());
+		if (arguments != null) {
+			children.add(arguments);
+		}
+		Object qualifier = getNodeSyntax(node.getQualifier());
+		if (qualifier != null) {
+			children.add(qualifier);
+		}
+		Object typeArguments = getListOf(node.typeArguments());
+		if (typeArguments != null) {
+			children.add(typeArguments);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -2035,7 +2613,30 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(SuperMethodReference node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "(", getPositionString(node.getStartPosition(), 1), ")", getPositionString(node.getStartPosition() + node.getLength(), 1));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getName());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		Object qualifier = getNodeSyntax(node.getQualifier());
+		if (qualifier != null) {
+			children.add(qualifier);
+		}
+		Object typeArguments = getListOf(node.typeArguments());
+		if (typeArguments != null) {
+			children.add(typeArguments);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -2052,7 +2653,36 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(SwitchCase node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "(", getPositionString(node.getStartPosition(), 1), ")", getPositionString(node.getStartPosition() + node.getLength(), 1));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getListOf(node.expressions());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		// Create atom for boolean property isDefault
+		Map<String, Object> defaultAtom = new HashMap<>();
+		String content = String.valueOf(node.isDefault());
+		createAtom(defaultAtom, content, getPositionString(node.getStartPosition(), content.length()));
+		defaultAtom.put("kind", "Normal");
+		children.add(defaultAtom);
+
+		// Create atom for boolean property isSwitchLabeledRule
+		Map<String, Object> labeledAtom = new HashMap<>();
+		content = String.valueOf(node.isSwitchLabeledRule());
+		createAtom(labeledAtom, content, getPositionString(node.getStartPosition(), content.length()));
+		labeledAtom.put("kind", "Normal");
+		children.add(labeledAtom);
+				
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -2068,7 +2698,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(SwitchStatement node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "{", getPositionString(node.getStartPosition(), 1), "}", getPositionString(node.getStartPosition() + node.getLength(), 1));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object expression = getNodeSyntax(node.getExpression());
+		if (expression != null) {
+			children.add(expression);
+		}
+		Object statements = getListOf(node.statements());
+		if (statements != null) {
+			children.add(statements);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -2084,7 +2733,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(SynchronizedStatement node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "{", getPositionString(node.getStartPosition(), 1), "}", getPositionString(node.getStartPosition() + node.getLength(), 1));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object nodeBody = getNodeSyntax(node.getBody());
+		if (nodeBody != null) {
+			children.add(nodeBody);
+		}
+		Object expression = getNodeSyntax(node.getExpression());
+		if (expression != null) {
+			children.add(expression);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 
@@ -2102,7 +2770,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(TagElement node) {
-		throw new Error("Not Implemented!!!");
+		return false;
 	}
 
 
@@ -2120,7 +2788,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.0
 	 */
 	public boolean visit(TextElement node) {
-		throw new Error("Not Implemented!!!");
+		return false;
 	}
 
 
@@ -2168,7 +2836,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(ThrowStatement node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object expression = getNodeSyntax(node.getExpression());
+		if (expression != null) {
+			children.add(expression);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -2270,7 +2953,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * be skipped
 	 */
 	public boolean visit(TypeDeclarationStatement node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+		ArrayList<Object> children = new ArrayList<>();
+		Object declaration = getNodeSyntax(node.getDeclaration());
+		if (declaration != null) {
+			children.add(declaration);
+		}
+		syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -2318,7 +3016,30 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.10
 	 */
 	public boolean visit(TypeMethodReference node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getName());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		Object type = getNodeSyntax(node.getType());
+		if (type != null) {
+			children.add(type);
+		}
+		Object typeArguments = getListOf(node.typeArguments());
+		if (typeArguments != null) {
+			children.add(typeArguments);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -2335,7 +3056,30 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(TypeParameter node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object nodeName = getNodeSyntax(node.getName());
+		if (nodeName != null) {
+			children.add(nodeName);
+		}
+		Object modifiers = getListOf(node.modifiers());
+		if (modifiers != null) {
+			children.add(modifiers);
+		}
+		Object typeBounds = getListOf(node.typeBounds());
+		if (typeBounds != null) {
+			children.add(typeBounds);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -2352,7 +3096,22 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.7.1
 	 */
 	public boolean visit(UnionType node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object types = getListOf(node.types());
+		if (types != null) {
+			children.add(types);
+		}
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -2448,8 +3207,9 @@ public class SyntaxVisitor extends ASTVisitor {
 	        children.add(nodeName);
 	    }
 	    
-	    if (node.getInitializer() != null) {
-	        children.add(getNodeSyntax(node.getInitializer()));
+		Object initializer = getNodeSyntax(node.getInitializer());
+	    if (initializer != null) {
+	        children.add(initializer);
 	    }
 	    syntaxMap.put("children", children);
 
@@ -2474,7 +3234,26 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(WhileStatement node) {
-		throw new Error("Not Implemented!!!");
+	    syntaxMap = new HashMap<>();
+	    
+	    createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+	    
+	    ArrayList<Object> children = new ArrayList<>();
+		Object body = getNodeSyntax(node.getBody());
+		if (body != null) {
+	        children.add(body);
+	    }
+		Object expression = getNodeSyntax(node.getExpression());
+		if (expression != null) {
+	        children.add(expression);
+	    }
+	    syntaxMap.put("children", children);
+
+	    syntaxMap.put("uniqueId", node.hashCode());
+	    
+	    syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 
 	/**
@@ -2491,6 +3270,29 @@ public class SyntaxVisitor extends ASTVisitor {
 	 * @since 3.1
 	 */
 	public boolean visit(WildcardType node) {
-		throw new Error("Not Implemented!!!");
+		syntaxMap = new HashMap<>();
+		
+		createList(syntaxMap, "", getPositionString(node.getStartPosition(), 0), "", getPositionString(node.getStartPosition() + node.getLength(), 0));
+		
+        ArrayList<Object> children = new ArrayList<>();
+		Object bound = getNodeSyntax(node.getBound());
+		if (bound != null) {
+			children.add(bound);
+		}
+
+		// Create atom for boolean property isUpperBound
+		Map<String, Object> upperBoundAtom = new HashMap<>();
+		String content = String.valueOf(node.isUpperBound());
+		createAtom(upperBoundAtom, content, getPositionString(node.getStartPosition(), content.length()));
+		upperBoundAtom.put("kind", "Normal");
+		children.add(upperBoundAtom);
+		
+        syntaxMap.put("children", children);
+		
+		syntaxMap.put("uniqueId", node.hashCode());
+		
+		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+		
+		return false;
 	}
 }
