@@ -145,13 +145,15 @@ public class Main {
                 System.err.println("\nError saving RHS JSON to file: " + e.getMessage());
             }
 
-            // Execute the shell script
             executeScript("Shell", "bash", "/mnt/c/Users/Bitroix/Desktop/Technion/Diff/difftastic/diffmagic.sh");
             
-            // Execute the Python script
             executeScript("Python", 
                 "C:\\Users\\Bitroix\\AppData\\Local\\Microsoft\\WindowsApps\\python3.13.exe",
                 "c:/Users/Bitroix/Desktop/Technion/Diff/diffmagic/novel_components.py");
+            
+            executeScript("Python", 
+                "C:\\Users\\Bitroix\\AppData\\Local\\Microsoft\\WindowsApps\\python3.13.exe",
+                "c:/Users/Bitroix/Desktop/Technion/Diff/diffmagic/generate_diff.py");
 
         } catch (Exception e) {
             e.printStackTrace();

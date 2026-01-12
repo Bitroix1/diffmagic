@@ -34,7 +34,7 @@ def build_node_mappings(syntax_tree: dict) -> tuple:
     Traverse the syntax tree once and build all necessary mappings.
     
     Args:
-        syntax_tree: The syntax tree structure
+        syntax_tree: The syntax tree structure (can be dict with filenames as keys or direct tree)
         
     Returns:
         Tuple of (unique_id_to_id, id_to_unique_id, id_to_info) mappings
@@ -43,7 +43,7 @@ def build_node_mappings(syntax_tree: dict) -> tuple:
     id_to_unique_id = {}
     id_to_info = {}
     
-    def traverse(node):
+    def traverse(node, current_file='Unknown'):
         if isinstance(node, dict):
             node_id = node.get('id')
             unique_id = node.get('uniqueId')
@@ -60,23 +60,34 @@ def build_node_mappings(syntax_tree: dict) -> tuple:
                     'position': node.get('position', node.get('open_position', '')),
                     'nodeClass': node.get('nodeClass', 'Unknown'),
                     'node_kind': node.get('node_kind', 'unknown'),
-                    'uniqueId': unique_id if unique_id is not None else -1
+                    'uniqueId': unique_id if unique_id is not None else -1,
+                    'file': current_file
                 }
             
             # Recursively traverse children
             if 'children' in node:
                 for child in node['children']:
-                    traverse(child)
+                    traverse(child, current_file)
             
             # Traverse all other dict values
             for value in node.values():
                 if isinstance(value, (dict, list)):
-                    traverse(value)
+                    traverse(value, current_file)
         elif isinstance(node, list):
             for item in node:
-                traverse(item)
+                traverse(item, current_file)
     
-    traverse(syntax_tree)
+    # Handle the case where syntax_tree is organized by filename
+    # Check if the top-level keys look like filenames
+    for key, value in syntax_tree.items():
+        if isinstance(value, dict) and ('nodeClass' in value or 'children' in value):
+            # This key is likely a filename
+            traverse(value, key)
+        else:
+            # Not organized by filename, just traverse
+            traverse(syntax_tree, 'Unknown')
+            break
+    
     return unique_id_to_id, id_to_unique_id, id_to_info
 
 
@@ -252,16 +263,16 @@ def find_connected_components(edges: List[dict]) -> List[List[dict]]:
 
 def filter_novel_edges(json_path: str, diff_path: str):
     """
-    Main function to filter edges where both endpoints are novel.
-    
-    Args:
-        json_path: Path to the JSON file with edges and syntax tree
+    MaBuild all node mappings in one pass (this now includes file information per node)with edges and syntax tree
         diff_path: Path to the diff text file
     """
     with open(json_path, 'r') as f:
         data = json.load(f)
     
     novel_ids = parse_diff_file(diff_path)
+    
+    # Extract filename from the syntax tree
+    filename = data.get('syntax', {}).get('filename', 'Unknown')
     
     # Build all node mappings in one pass
     unique_id_to_id, id_to_unique_id, id_to_info = build_node_mappings(data.get('syntax', {}))
@@ -319,7 +330,7 @@ def components_to_json_structure(components: List[List[dict]],
     
     Args:
         components: List of connected components (lists of edge dictionaries)
-        id_to_info: Mapping from node ID to node information
+        id_to_info: Mapping from node ID to node information (includes file info)
         
     Returns:
         List of components, where each component is a list of edge dictionaries with node details
@@ -342,14 +353,16 @@ def components_to_json_structure(components: List[List[dict]],
                     'java_id': from_info.get('uniqueId', -1),
                     'type': f"{from_info.get('nodeClass', 'Unknown')} ({from_info.get('node_kind', 'unknown')})",
                     'content': from_info.get('content', 'N/A'),
-                    'position': from_info.get('position', 'N/A')
+                    'position': from_info.get('position', 'N/A'),
+                    'file': from_info.get('file', 'Unknown')
                 },
                 'to': {
                     'rust_id': to_id,
                     'java_id': to_info.get('uniqueId', -1),
                     'type': f"{to_info.get('nodeClass', 'Unknown')} ({to_info.get('node_kind', 'unknown')})",
                     'content': to_info.get('content', 'N/A'),
-                    'position': to_info.get('position', 'N/A')
+                    'position': to_info.get('position', 'N/A'),
+                    'file': to_info.get('file', 'Unknown')
                 },
                 'edge_label': edge.get('from', ''),
                 'edge_label_full': f"{edge.get('from', '')} -> {edge.get('to', '')}"
