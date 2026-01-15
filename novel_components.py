@@ -29,6 +29,40 @@ def parse_diff_file(diff_path: str) -> Set[int]:
     return novel_ids
 
 
+def parse_change_map(diff_path: str) -> Dict[int, int]:
+    """
+    Parse the ChangeMap from the diff file to find equivalent nodes between LHS and RHS.
+    
+    Args:
+        diff_path: Path to the diff text file
+        
+    Returns:
+        Dictionary mapping LHS node ID to RHS node ID for unchanged nodes
+    """
+    change_map = {}
+    
+    with open(diff_path, 'r') as f:
+        content = f.read()
+    
+    # Extract ChangeMap section
+    changemap_pattern = r'Changes: ChangeMap \{(.*?)\}'
+    match = re.search(changemap_pattern, content, re.DOTALL)
+    
+    if not match:
+        return change_map
+    
+    changemap_content = match.group(1)
+    
+    # Extract Unchanged mappings (format: "lhs_id: Unchanged(ID: rhs_id)")
+    unchanged_pattern = r'(\d+):\s*Unchanged\(ID:\s*(\d+)\)'
+    matches = re.findall(unchanged_pattern, changemap_content)
+    
+    for lhs_id, rhs_id in matches:
+        change_map[int(lhs_id)] = int(rhs_id)
+    
+    return change_map
+
+
 def build_node_mappings(syntax_tree: dict) -> tuple:
     """
     Traverse the syntax tree once and build all necessary mappings.
@@ -407,14 +441,247 @@ def combine_and_save_results(lhs_results: tuple, rhs_results: tuple, output_path
     print(f"  RHS total edges: {sum(len(comp) for comp in rhs_components)}")
 
 
+def get_edge_parents(edge: dict, parent_map: Dict[int, int]) -> tuple:
+    """
+    Get the parent IDs for both endpoints of an edge.
+    
+    Args:
+        edge: Edge dictionary with fromId and toId
+        parent_map: Mapping from child id to parent id
+        
+    Returns:
+        Tuple of (from_parent_id, to_parent_id), or (None, None) if no parents
+    """
+    from_id = edge['fromId']
+    to_id = edge['toId']
+    
+    from_parent = parent_map.get(from_id)
+    to_parent = parent_map.get(to_id)
+    
+    return from_parent, to_parent
+
+
+def get_component_novel_nodes(component: List[dict]) -> Set[int]:
+    """
+    Extract all unique node IDs from a component's edges.
+    
+    Args:
+        component: List of edge dictionaries with fromId and toId
+        
+    Returns:
+        Set of all node IDs involved in the component
+    """
+    nodes = set()
+    for edge in component:
+        nodes.add(edge['fromId'])
+        nodes.add(edge['toId'])
+    return nodes
+
+
+def merge_components_by_parent_equivalence(
+    lhs_components: List[List[dict]],
+    rhs_components: List[List[dict]],
+    lhs_parent_map: Dict[int, int],
+    rhs_parent_map: Dict[int, int],
+    change_map: Dict[int, int],
+    lhs_id_to_info: Dict[int, dict],
+    rhs_id_to_info: Dict[int, dict]
+) -> List[dict]:
+    """
+    Merge LHS and RHS components based on equivalent parent nodes and child offsets.
+    Components are merged if nodes share equivalent parents (via change_map) AND
+    have matching child offsets (child_id - parent_id), which represents the child's index.
+    
+    Args:
+        lhs_components: List of LHS components (lists of edges)
+        rhs_components: List of RHS components (lists of edges)
+        lhs_parent_map: Parent mapping for LHS nodes
+        rhs_parent_map: Parent mapping for RHS nodes
+        change_map: Mapping from LHS node IDs to RHS node IDs
+        lhs_id_to_info: Node info mapping for LHS
+        rhs_id_to_info: Node info mapping for RHS
+        
+    Returns:
+        List of merged components with kind annotations
+    """
+    merged_components = []
+    
+    # Track which RHS components have been merged
+    used_rhs_components = set()
+    
+    # For each LHS component, try to find matching RHS components
+    for lhs_comp_idx, lhs_comp in enumerate(lhs_components):
+        # Get all novel nodes in this LHS component with their parent-child relationships
+        lhs_nodes = get_component_novel_nodes(lhs_comp)
+        lhs_parent_offset_pairs = set()  # (parent_id, offset)
+        
+        for node_id in lhs_nodes:
+            parent_id = lhs_parent_map.get(node_id)
+            if parent_id is not None:
+                offset = node_id - parent_id
+                lhs_parent_offset_pairs.add((parent_id, offset))
+        
+        # Find RHS components with nodes that have equivalent parents AND matching offsets
+        matching_rhs_components = []
+        
+        for rhs_comp_idx, rhs_comp in enumerate(rhs_components):
+            if rhs_comp_idx in used_rhs_components:
+                continue
+            
+            # Get all novel nodes in this RHS component with their parent-child relationships
+            rhs_nodes = get_component_novel_nodes(rhs_comp)
+            rhs_parent_offset_pairs = set()  # (parent_id, offset)
+            
+            for node_id in rhs_nodes:
+                parent_id = rhs_parent_map.get(node_id)
+                if parent_id is not None:
+                    offset = node_id - parent_id
+                    rhs_parent_offset_pairs.add((parent_id, offset))
+            
+            # Check if any (parent, offset) pair from LHS matches any from RHS
+            # Parents must be equivalent via change_map, offsets must match exactly
+            has_match = False
+            for lhs_parent, lhs_offset in lhs_parent_offset_pairs:
+                for rhs_parent, rhs_offset in rhs_parent_offset_pairs:
+                    # Check if parents are equivalent AND offsets match
+                    if change_map.get(lhs_parent) == rhs_parent and lhs_offset == rhs_offset:
+                        has_match = True
+                        print(f"  Merging components: LHS parent {lhs_parent} matches RHS parent {rhs_parent} with offset {lhs_offset}")
+                        break
+                
+                if has_match:
+                    break
+            
+            if has_match:
+                matching_rhs_components.append(rhs_comp_idx)
+                used_rhs_components.add(rhs_comp_idx)
+        
+        # Create merged component
+        merged_component = {
+            'removals': components_to_json_structure([lhs_comp], lhs_id_to_info)[0] if lhs_comp else [],
+            'additions': []
+        }
+        
+        # Add matching RHS components as additions
+        for rhs_comp_idx in matching_rhs_components:
+            rhs_comp = rhs_components[rhs_comp_idx]
+            rhs_comp_json = components_to_json_structure([rhs_comp], rhs_id_to_info)[0]
+            merged_component['additions'].extend(rhs_comp_json)
+        
+        merged_components.append(merged_component)
+    
+    # Add remaining RHS components that weren't matched (pure additions)
+    for rhs_comp_idx, rhs_comp in enumerate(rhs_components):
+        if rhs_comp_idx not in used_rhs_components:
+            merged_component = {
+                'removals': [],
+                'additions': components_to_json_structure([rhs_comp], rhs_id_to_info)[0]
+            }
+            merged_components.append(merged_component)
+    
+    return merged_components
+
+
+def create_diff_components(
+    lhs_results: tuple,
+    rhs_results: tuple,
+    lhs_parent_map: Dict[int, int],
+    rhs_parent_map: Dict[int, int],
+    change_map: Dict[int, int],
+    output_path: str
+):
+    """
+    Create the final diff_components JSON with merged LHS/RHS changes.
+    
+    Args:
+        lhs_results: Tuple of (components, id_to_info) for LHS
+        rhs_results: Tuple of (components, id_to_info) for RHS
+        lhs_parent_map: Parent mapping for LHS nodes
+        rhs_parent_map: Parent mapping for RHS nodes
+        change_map: Mapping from LHS node IDs to RHS node IDs
+        output_path: Path for the output JSON file
+    """
+    lhs_components, lhs_id_to_info = lhs_results
+    rhs_components, rhs_id_to_info = rhs_results
+    
+    merged_components = merge_components_by_parent_equivalence(
+        lhs_components,
+        rhs_components,
+        lhs_parent_map,
+        rhs_parent_map,
+        change_map,
+        lhs_id_to_info,
+        rhs_id_to_info
+    )
+    
+    # Add kind field to each edge
+    final_components = []
+    for component in merged_components:
+        final_component = {
+            'changes': []
+        }
+        
+        # Add removals with kind="Removal"
+        for edge in component['removals']:
+            edge_with_kind = edge.copy()
+            edge_with_kind['kind'] = 'Removal'
+            final_component['changes'].append(edge_with_kind)
+        
+        # Add additions with kind="Addition"
+        for edge in component['additions']:
+            edge_with_kind = edge.copy()
+            edge_with_kind['kind'] = 'Addition'
+            final_component['changes'].append(edge_with_kind)
+        
+        if final_component['changes']:
+            final_components.append(final_component)
+    
+    output = {'diff_components': final_components}
+    
+    with open(output_path, 'w') as f:
+        json.dump(output, f, indent=2)
+    
+    print(f"\nDiff components JSON written to {output_path}")
+    print(f"  Total merged components: {len(final_components)}")
+    print(f"  Components with both removals and additions: {sum(1 for c in merged_components if c['removals'] and c['additions'])}")
+    print(f"  Components with only removals: {sum(1 for c in merged_components if c['removals'] and not c['additions'])}")
+    print(f"  Components with only additions: {sum(1 for c in merged_components if not c['removals'] and c['additions'])}")
+
+
 if __name__ == "__main__":
     base_path = r"C:\Users\Bitroix\Desktop\Technion\Diff\difftastic\Files"
     lhs_json_path = base_path + r"\lhs.json"
     rhs_json_path = base_path + r"\rhs.json"
     diff_path = base_path + r"\result.txt"
     output_path = base_path + r"\output.json"
+    diff_components_path = base_path + r"\diff_components.json"
     
+    # Parse change map from diff file
+    change_map = parse_change_map(diff_path)
+    print(f"Parsed ChangeMap with {len(change_map)} mappings")
+    
+    # Process LHS and RHS
     lhs_results = filter_novel_edges(lhs_json_path, diff_path)
     rhs_results = filter_novel_edges(rhs_json_path, diff_path)
     
+    # Save original output.json (for backwards compatibility)
     combine_and_save_results(lhs_results, rhs_results, output_path)
+    
+    # Load syntax trees to build parent maps
+    with open(lhs_json_path, 'r') as f:
+        lhs_data = json.load(f)
+    with open(rhs_json_path, 'r') as f:
+        rhs_data = json.load(f)
+    
+    lhs_parent_map = build_parent_mapping(lhs_data.get('syntax', {}))
+    rhs_parent_map = build_parent_mapping(rhs_data.get('syntax', {}))
+    
+    # Create diff_components.json with merged changes
+    create_diff_components(
+        lhs_results,
+        rhs_results,
+        lhs_parent_map,
+        rhs_parent_map,
+        change_map,
+        diff_components_path
+    )
