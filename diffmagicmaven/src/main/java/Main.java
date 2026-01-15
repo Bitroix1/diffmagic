@@ -150,10 +150,6 @@ public class Main {
             executeScript("Python", 
                 "C:\\Users\\Bitroix\\AppData\\Local\\Microsoft\\WindowsApps\\python3.13.exe",
                 "c:/Users/Bitroix/Desktop/Technion/Diff/diffmagic/novel_components.py");
-            
-            executeScript("Python", 
-                "C:\\Users\\Bitroix\\AppData\\Local\\Microsoft\\WindowsApps\\python3.13.exe",
-                "c:/Users/Bitroix/Desktop/Technion/Diff/diffmagic/generate_diff.py");
 
         } catch (Exception e) {
             e.printStackTrace();
