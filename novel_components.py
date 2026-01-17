@@ -649,12 +649,13 @@ def create_diff_components(
 
 
 if __name__ == "__main__":
-    base_path = r"C:\Users\Bitroix\Desktop\Technion\Diff\difftastic\Files"
-    lhs_json_path = base_path + r"\lhs.json"
-    rhs_json_path = base_path + r"\rhs.json"
-    diff_path = base_path + r"\result.txt"
-    output_path = base_path + r"\output.json"
-    diff_components_path = base_path + r"\diff_components.json"
+    import os
+    base_path = os.path.join(os.path.dirname(__file__), "..", "difftastic", "Files")
+    lhs_json_path = os.path.join(base_path, "lhs.json")
+    rhs_json_path = os.path.join(base_path, "rhs.json")
+    diff_path = os.path.join(base_path, "result.txt")
+    output_path = os.path.join(base_path, "output.json")
+    diff_components_path = os.path.join(base_path, "diff_components.json")
     
     # Parse change map from diff file
     change_map = parse_change_map(diff_path)
