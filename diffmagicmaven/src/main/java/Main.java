@@ -146,12 +146,11 @@ public class Main {
             }
 
             executeScript("Shell", "bash", 
-                ".." + File.separator + ".." + File.separator + ".." + File.separator + ".." + File.separator + 
-                "difftastic" + File.separator + "diffmagic.sh");
+                "../../difftastic/diffmagic.sh");
             
             executeScript("Python", 
                 "python",
-                ".." + File.separator + ".." + File.separator + ".." + File.separator + ".." + File.separator + 
+                ".." + File.separator + ".." + File.separator +
                 "diffmagic" + File.separator + "novel_components.py");
 
         } catch (Exception e) {
