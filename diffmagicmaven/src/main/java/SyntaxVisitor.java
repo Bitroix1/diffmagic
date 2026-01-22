@@ -98,18 +98,7 @@ public class SyntaxVisitor extends ASTVisitor {
 		if (list == null || list.isEmpty()) {
 			return null;
 		}
-		
-		// If there's only one element, return it directly without wrapping in a list
-		if (list.size() == 1) {
-			Object object = list.get(0);
-			if (object instanceof ASTNode) {
-				ASTNode node = (ASTNode)object;
-				return getNodeSyntax(node);
-			}
-			return object;
-		}
-		
-		// For multiple elements, track the positions of first and last nodes
+
 		List<Object> objectList = new ArrayList<>();
 		int firstNodeStart = -1;
 		int lastNodeEnd = -1;
@@ -152,8 +141,7 @@ public class SyntaxVisitor extends ASTVisitor {
         if (startPosition < 0 || length < 0) {
             return "0:0-0";
         }
-        // Convert from 1-indexed (Eclipse JDT) to 0-indexed
-        int startLine = cu.getLineNumber(startPosition) - 1;
+        int startLine = cu.getLineNumber(startPosition);
         int startCol = cu.getColumnNumber(startPosition);
         int endCol = startCol + length;
         
