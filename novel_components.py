@@ -253,6 +253,52 @@ def find_connected_components(edges: List[dict]) -> List[List[dict]]:
     return edge_components
 
 
+def faster_find_connected_components(edges: List[dict]) -> List[List[dict]]:
+    # same as `find_connected_components`
+    if not edges:
+        return []
+    # same as `find_connected_components`
+    G = nx.Graph()
+    # same as `find_connected_components`
+    for edge in edges:
+        from_id = edge['fromId']
+        to_id = edge['toId']
+        G.add_edge(from_id, to_id)
+
+    # list of sets of node ids that are in the same CC.
+    node_components = list(nx.connected_components(G))
+
+    # make an empty dict first
+    node_to_component = {}
+
+    # this is going over all node components and mapping each node to its idx
+    for idx, node_component in enumerate(node_components):
+        for node_id in node_component:
+            node_to_component[node_id] = idx
+
+    # make an empty list of edge components
+    edge_components = [[] for _ in range(len(node_components))]
+
+    # fill the edge components
+    for edge in edges:
+        from_id = edge['fromId']
+        to_id = edge['toId']
+        component_idx = node_to_component.get(from_id)
+        if component_idx is None:
+            continue
+        # just a sanity check
+        if component_idx != node_to_component.get(to_id):
+            raise ValueError(f"Edge endpoints in different components: {from_id} -> {to_id}")
+        edge_components[component_idx].append(edge)
+
+    # we probably want to only keep non-empty components
+    edge_components = [component for component in edge_components if component]
+
+    # same as `find_connected_components`
+    edge_components.sort(key=len, reverse=True)
+
+    return edge_components
+
 def filter_novel_edges(json_path: str, diff_path: str):
     """
     MaBuild all node mappings in one pass (this now includes file information per node)with edges and syntax tree
