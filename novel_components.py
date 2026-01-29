@@ -70,7 +70,10 @@ def build_node_mappings(syntax_tree: dict) -> tuple:
                     traverse(child, current_file)
             
             # Traverse all other dict values
-            for value in node.values():
+            for key, value in node.items():
+                # Not sure!! but maybe we can skip this here?
+                if key == 'children':
+                    continue
                 if isinstance(value, (dict, list)):
                     traverse(value, current_file)
         elif isinstance(node, list):
@@ -122,7 +125,10 @@ def build_parent_mapping(syntax_tree: dict) -> Dict[int, int]:
                         
             # Traverse all other dict values
             for key, value in node.items():
-                if key != 'children' and isinstance(value, (dict, list)):
+                # Not sure!! but maybe skip children since it's already traversed above?
+                if key == 'children':
+                    continue
+                if isinstance(value, (dict, list)):
                     traverse(value, parent_id)
         elif isinstance(node, list):
             for item in node:
@@ -135,7 +141,8 @@ def build_parent_mapping(syntax_tree: dict) -> Dict[int, int]:
 def find_largest_novel_ancestor(node_id: int, 
                                 parent_map: Dict[int, int], 
                                 novel_ids: Set[int],
-                                id_to_unique_id: Dict[int, int]) -> int:
+                                id_to_unique_id: Dict[int, int],
+                                cache: Dict[int, int] = None) -> int:
     """
     Find the largest (highest in tree) novel ancestor of a node that has a valid uniqueId.
     
@@ -148,7 +155,12 @@ def find_largest_novel_ancestor(node_id: int,
     Returns:
         The id of the largest novel ancestor with a valid uniqueId, or the original node_id if no novel ancestor exists
     """
+    if cache is not None and node_id in cache:
+        return cache[node_id]
+
     if node_id not in novel_ids:
+        if cache is not None:
+            cache[node_id] = node_id
         return node_id
     
     # Only consider this node as a candidate if it has a valid uniqueId
@@ -168,7 +180,10 @@ def find_largest_novel_ancestor(node_id: int,
             break
     
     # If we didn't find any valid ancestor (including the node itself), return the original node
-    return largest_novel if largest_novel is not None else node_id
+    res = largest_novel if largest_novel is not None else node_id
+    if cache is not None:
+        cache[node_id] = res
+    return res
 
 
 def filter_internal_edges(edges: List[dict], 
@@ -188,14 +203,14 @@ def filter_internal_edges(edges: List[dict],
         List of edges with internal edges removed
     """
     filtered_edges = []
-        
+    cache = {}
     for edge in edges:
         from_id = edge['fromId']
         to_id = edge['toId']
         
         # Find largest novel ancestor for both endpoints
-        from_ancestor = find_largest_novel_ancestor(from_id, parent_map, novel_ids, id_to_unique_id)
-        to_ancestor = find_largest_novel_ancestor(to_id, parent_map, novel_ids, id_to_unique_id)
+        from_ancestor = find_largest_novel_ancestor(from_id, parent_map, novel_ids, id_to_unique_id, cache)
+        to_ancestor = find_largest_novel_ancestor(to_id, parent_map, novel_ids, id_to_unique_id, cache)
         
         # Skip edges where both endpoints have the same novel ancestor (internal edges)
         if from_ancestor == to_ancestor:
