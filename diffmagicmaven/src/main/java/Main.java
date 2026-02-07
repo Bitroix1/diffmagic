@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 public class Main {
     // Base directory for input/output files
@@ -148,10 +149,10 @@ public class Main {
             executeScript("Shell", "bash", 
                 "../../difftastic/diffmagic.sh");
             
-            executeScript("Python", 
-                "python",
-                ".." + File.separator + ".." + File.separator +
-                "diffmagic" + File.separator + "novel_components.py");
+             executeScript("Python", 
+                 "python",
+                 ".." + File.separator + ".." + File.separator +
+                 "diffmagic" + File.separator + "novel_components.py");
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -388,6 +389,20 @@ public class Main {
         // Only assign ID if not already assigned
         if (!node.containsKey("id")) {
             node.put("id", idCounter[0]++);
+        }
+        
+        // Add nodeClass if not present
+        if (!node.containsKey("nodeClass")) {
+            node.put("nodeClass", "Structural");
+        }
+        
+        // Add uniqueId if not present (random positive 64-bit number)
+        if (!node.containsKey("uniqueId")) {
+            Random random = new Random();
+            // Generate a positive random long by clearing the sign bit
+            // This gives us a random number in the range [0, Long.MAX_VALUE]
+            long uniqueId = random.nextLong() & Long.MAX_VALUE;
+            node.put("uniqueId", uniqueId);
         }
         
         // Recursively assign IDs to children in DFS order
