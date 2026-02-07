@@ -63,37 +63,69 @@ public class Main {
 
             // Process LHS files
             List<String> lhsJavaFiles = getAllJavaFiles(new File(lhsSourceDir));
+            java.util.Collections.sort(lhsJavaFiles);  // Sort for consistent ordering
             List<FileDetails> lhsFilesDetails = processFiles(lhsJavaFiles, 1);
 
-            // Output LHS data
-            Map<String, Object> lhsOutput = new HashMap<>();
+            // Process RHS files (need both before assigning IDs)
+            int lastLhsUniqueId = SyntaxVisitor.getLastUniqueId();
+            List<String> rhsJavaFiles = getAllJavaFiles(new File(rhsSourceDir));
+            java.util.Collections.sort(rhsJavaFiles);  // Sort for consistent ordering
+            List<FileDetails> rhsFilesDetails = processFiles(rhsJavaFiles, lastLhsUniqueId + 1);
+
+            // Prepare output structures
+            Map<String, Object> lhsOutput = new java.util.LinkedHashMap<>();
+            Map<String, Object> rhsOutput = new java.util.LinkedHashMap<>();
             
             List<Edge> lhsNameResEdges = new ArrayList<>();
-            Map<String, Object> lhsSyntaxes = new HashMap<>();
+            Map<String, Object> lhsSyntaxes = new java.util.LinkedHashMap<>();
+            
+            List<Edge> rhsNameResEdges = new ArrayList<>();
+            Map<String, Object> rhsSyntaxes = new java.util.LinkedHashMap<>();
 
-            // Collect data from processed files
+            // Collect LHS data
             for (FileDetails fileDetails : lhsFilesDetails) {
                 lhsNameResEdges.addAll(fileDetails.nameResEdges);
-                
                 String fileName = new File(fileDetails.fileName).getName();
                 lhsSyntaxes.put(fileName, fileDetails.syntax);
+            }
+
+            // Collect RHS data
+            for (FileDetails fileDetails : rhsFilesDetails) {
+                rhsNameResEdges.addAll(fileDetails.nameResEdges);
+                String fileName = new File(fileDetails.fileName).getName();
+                rhsSyntaxes.put(fileName, fileDetails.syntax);
+            }
+
+            // Assign IDs in interleaved order: LHS file 1, RHS file 1, LHS file 2, RHS file 2, etc.
+            int[] idCounter = {1};
+            java.util.Iterator<Map.Entry<String, Object>> lhsIter = lhsSyntaxes.entrySet().iterator();
+            java.util.Iterator<Map.Entry<String, Object>> rhsIter = rhsSyntaxes.entrySet().iterator();
+            
+            while (lhsIter.hasNext() && rhsIter.hasNext()) {
+                idCounter[0] = 1;
+                // Assign IDs to LHS file
+                Map.Entry<String, Object> lhsEntry = lhsIter.next();
+                if (lhsEntry.getValue() instanceof Map) {
+                    assignDFSIds((Map<String, Object>) lhsEntry.getValue(), idCounter);
+                }
+                
+                // Assign IDs to corresponding RHS file
+                Map.Entry<String, Object> rhsEntry = rhsIter.next();
+                if (rhsEntry.getValue() instanceof Map) {
+                    assignDFSIds((Map<String, Object>) rhsEntry.getValue(), idCounter);
+                }
             }
 
             lhsOutput.put("nameResEdges", lhsNameResEdges);
             lhsOutput.put("syntax", lhsSyntaxes);
             
-            // Assign IDs to LHS syntax trees
-            int[] idCounter = {1};
-            for (Object syntaxTree : lhsSyntaxes.values()) {
-                if (syntaxTree instanceof Map) {
-                    assignDFSIds((Map<String, Object>) syntaxTree, idCounter);
-                }
-            }
-            int lastLhsId = idCounter[0] - 1;
+            rhsOutput.put("nameResEdges", rhsNameResEdges);
+            rhsOutput.put("syntax", rhsSyntaxes);
 
-            // Convert LHS to JSON with pretty printing
+            // Convert to JSON with pretty printing
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
             String lhsJsonStr = gson.toJson(lhsOutput);
+            String rhsJsonStr = gson.toJson(rhsOutput);
 
             // Save LHS JSON to file
             try (FileWriter file = new FileWriter(BASE_DIR + "lhs.json")) {
@@ -102,41 +134,6 @@ public class Main {
             } catch (IOException e) {
                 System.err.println("\nError saving LHS JSON to file: " + e.getMessage());
             }
-
-            int lastLhsUniqueId = SyntaxVisitor.getLastUniqueId();
-
-            // Process RHS files
-            List<String> rhsJavaFiles = getAllJavaFiles(new File(rhsSourceDir));
-            List<FileDetails> rhsFilesDetails = processFiles(rhsJavaFiles, lastLhsUniqueId + 1);
-
-            // Output RHS data
-            Map<String, Object> rhsOutput = new HashMap<>();
-            
-            List<Edge> rhsNameResEdges = new ArrayList<>();
-            Map<String, Object> rhsSyntaxes = new HashMap<>();
-
-            // Collect data from processed files
-            for (FileDetails fileDetails : rhsFilesDetails) {
-                rhsNameResEdges.addAll(fileDetails.nameResEdges);
-                
-                String fileName = new File(fileDetails.fileName).getName();
-                rhsSyntaxes.put(fileName, fileDetails.syntax);
-            }
-
-            rhsOutput.put("nameResEdges", rhsNameResEdges);
-            rhsOutput.put("syntax", rhsSyntaxes);
-            
-            // Assign IDs to RHS syntax trees, continuing from where LHS left off
-            idCounter[0] = lastLhsId + 1;
-            for (Object syntaxTree : rhsSyntaxes.values()) {
-                if (syntaxTree instanceof Map) {
-                    assignDFSIds((Map<String, Object>) syntaxTree, idCounter);
-                }
-            }
-
-            // Convert RHS to JSON with pretty printing
-            String rhsJsonStr = gson.toJson(rhsOutput);
-
 
             // Save RHS JSON to file
             try (FileWriter file = new FileWriter(BASE_DIR + "rhs.json")) {
@@ -149,10 +146,10 @@ public class Main {
             executeScript("Shell", "bash", 
                 "../../difftastic/diffmagic.sh");
             
-             executeScript("Python", 
-                 "python",
-                 ".." + File.separator + ".." + File.separator +
-                 "diffmagic" + File.separator + "novel_components.py");
+            executeScript("Python", 
+                "python",
+                ".." + File.separator + ".." + File.separator +
+                "diffmagic" + File.separator + "novel_components.py");
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -268,6 +265,9 @@ public class Main {
             System.err.println("Warning: Cannot access directory contents: " + directory.getAbsolutePath());
             return javaFiles;
         }
+        
+        // Sort files for consistent ordering
+        java.util.Arrays.sort(files);
         
         for (File file : files) {
             if (file.isDirectory()) {
