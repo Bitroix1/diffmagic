@@ -64,8 +64,8 @@ def build_node_mappings(syntax_tree: dict) -> Dict[int, dict]:
             # Traverse all other dict values
             for key, value in node.items():
                 # Not sure!! but maybe we can skip this here?
-                # if key == 'children':
-                #     continue
+                if key == 'children':
+                    continue
                 if isinstance(value, (dict, list)):
                     traverse(value, current_file)
         elif isinstance(node, list):
