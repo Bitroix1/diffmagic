@@ -55,6 +55,12 @@ public class EdgeAdder {
                 }
                 return super.visit(node);
             }
+
+            @Override
+            public boolean visit(SimpleType node) {
+                handleGenericTypeArgument(node);
+                return super.visit(node);
+            }
         });
     }
     
@@ -145,6 +151,92 @@ public class EdgeAdder {
             nameResEdges.add(new Main.Edge(returnLiteralId, methodReturnTypeId, returnLiteralIdNum, methodReturnTypeIdNum));
             
             System.out.println("  Added literal-to-method-return-type edge: " + returnLiteralId + " -> " + methodReturnTypeId);
+        }
+    }
+    
+    private void handleGenericTypeArgument(SimpleType simpleType) {
+        // Check if this SimpleName is part of a type argument
+        // The structure is: ParameterizedType -> SimpleType -> SimpleName
+        SimpleName node = (SimpleName)simpleType.getName();
+        
+        ASTNode grandParent = simpleType.getParent();
+        
+        if (!(grandParent instanceof ParameterizedType)) {
+            return;
+        }
+        
+        ParameterizedType paramType = (ParameterizedType) grandParent;
+        
+        // Find which type argument this is
+        List<?> typeArgs = paramType.typeArguments();
+        System.out.println("  Total type arguments: " + typeArgs.size());
+        int typeArgIndex = -1;
+        for (int i = 0; i < typeArgs.size(); i++) {
+            System.out.println("    Checking typeArg[" + i + "]: " + typeArgs.get(i).getClass().getSimpleName());
+            if (typeArgs.get(i) == simpleType) {
+                typeArgIndex = i;
+                System.out.println("    MATCH at index " + i);
+                break;
+            }
+        }
+        
+        if (typeArgIndex == -1) {
+            System.out.println("  WARNING: Could not find type argument index");
+            return;
+        }
+        
+        
+        // Get the base type
+        Type baseType = paramType.getType();
+        System.out.println("  Base type node: " + baseType.toString());
+        ITypeBinding baseTypeBinding = baseType.resolveBinding();
+        
+        if (baseTypeBinding == null) {
+            System.out.println("  WARNING: Could not resolve base type binding");
+            return;
+        }
+        
+        
+        // Get the generic type declaration to access type parameters
+        ITypeBinding genericTypeBinding = baseTypeBinding.getTypeDeclaration();
+        if (genericTypeBinding == null) {
+            genericTypeBinding = baseTypeBinding; // fallback
+        }
+        
+        // Get the type parameters from the generic type declaration
+        ITypeBinding[] typeParams = genericTypeBinding.getTypeParameters();
+        System.out.println("  Type parameters count: " + typeParams.length);
+        
+        if (typeArgIndex >= typeParams.length) {
+            System.out.println("  WARNING: Type argument index out of bounds");
+            return;
+        }
+        
+        
+        // Find the TypeParameter node in the AST
+        ASTNode baseDecl = findDeclaringNodeForBinding(baseTypeBinding);
+        
+        if (baseDecl instanceof TypeDeclaration) {
+            TypeDeclaration baseTypeDecl = (TypeDeclaration) baseDecl;
+            List<?> typeParamsList = baseTypeDecl.typeParameters();
+            System.out.println("  Type parameters in AST: " + typeParamsList.size());
+            
+            if (typeArgIndex < typeParamsList.size()) {
+                TypeParameter typeParam = (TypeParameter) typeParamsList.get(typeArgIndex);
+                SimpleName typeParamName = typeParam.getName();
+                
+                String typeArgId = "GenericTypeArg:TypeArg:" + node.toString() + "@" + node.getStartPosition();
+                int typeArgIdNum = node.hashCode();
+                
+                String typeParamId = "GenericTypeArg:TypeParam:" + typeParamName.toString() + "@" + typeParamName.getStartPosition();
+                int typeParamIdNum = typeParamName.hashCode();
+                
+                System.out.println("  Creating edge:");
+                System.out.println("    From: " + typeArgId + " (hash: " + typeArgIdNum + ")");
+                System.out.println("    To: " + typeParamId + " (hash: " + typeParamIdNum + ")");
+                
+                nameResEdges.add(new Main.Edge(typeArgId, typeParamId, typeArgIdNum, typeParamIdNum));
+            }
         }
     }
     

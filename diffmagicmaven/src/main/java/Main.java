@@ -73,14 +73,12 @@ public class Main {
             List<FileDetails> rhsFilesDetails = processFiles(rhsJavaFiles, lastLhsUniqueId + 1);
 
             // Prepare output structures
+            List<Edge> lhsNameResEdges = new ArrayList<>();
+            List<Edge> rhsNameResEdges = new ArrayList<>();
+            Map<String, Object> lhsSyntaxes = new java.util.LinkedHashMap<>();
+            Map<String, Object> rhsSyntaxes = new java.util.LinkedHashMap<>();
             Map<String, Object> lhsOutput = new java.util.LinkedHashMap<>();
             Map<String, Object> rhsOutput = new java.util.LinkedHashMap<>();
-            
-            List<Edge> lhsNameResEdges = new ArrayList<>();
-            Map<String, Object> lhsSyntaxes = new java.util.LinkedHashMap<>();
-            
-            List<Edge> rhsNameResEdges = new ArrayList<>();
-            Map<String, Object> rhsSyntaxes = new java.util.LinkedHashMap<>();
 
             // Collect LHS data
             for (FileDetails fileDetails : lhsFilesDetails) {
@@ -96,11 +94,12 @@ public class Main {
                 rhsSyntaxes.put(fileName, fileDetails.syntax);
             }
 
-            // Assign IDs in interleaved order: LHS file 1, RHS file 1, LHS file 2, RHS file 2, etc.
+            // Assign IDs in interleaved order
             int[] idCounter = {1};
             java.util.Iterator<Map.Entry<String, Object>> lhsIter = lhsSyntaxes.entrySet().iterator();
             java.util.Iterator<Map.Entry<String, Object>> rhsIter = rhsSyntaxes.entrySet().iterator();
             
+            // order breaks if there are added files- TODO
             while (lhsIter.hasNext() && rhsIter.hasNext()) {
                 idCounter[0] = 1;
                 // Assign IDs to LHS file
@@ -117,9 +116,8 @@ public class Main {
             }
 
             lhsOutput.put("nameResEdges", lhsNameResEdges);
-            lhsOutput.put("syntax", lhsSyntaxes);
-            
             rhsOutput.put("nameResEdges", rhsNameResEdges);
+            lhsOutput.put("syntax", lhsSyntaxes);
             rhsOutput.put("syntax", rhsSyntaxes);
 
             // Convert to JSON with pretty printing

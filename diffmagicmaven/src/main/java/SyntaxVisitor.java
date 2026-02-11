@@ -2086,6 +2086,10 @@ public class SyntaxVisitor extends ASTVisitor {
 		if (nodeType != null) {
 			children.add(nodeType);
 		}
+		Object typeArguments = getListOf(node.typeArguments());
+		if (typeArguments != null) {
+			children.add(typeArguments);
+		}
         syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
@@ -2901,6 +2905,10 @@ public class SyntaxVisitor extends ASTVisitor {
 		Object nodeName = getNodeSyntax(node.getName());
 		if (nodeName != null) {
 			children.add(nodeName);
+		}
+		Object typeParameters = getListOf(node.typeParameters());
+		if (typeParameters != null) {
+			children.add(typeParameters);
 		}
 		Object nodeFields = getListOf(Arrays.asList(node.getFields()));
 		if (nodeFields != null) {

@@ -117,6 +117,30 @@ public class PatternMatchingVisitor extends ASTVisitor {
         return true;
     }
     
+    @Override
+    public boolean visit(SimpleType node) {
+        System.out.println("  Pattern: Parametric edge");
+        // Check if usageNode is the name of this SimpleType
+        Name typeName = node.getName();
+        SimpleName simpleName = null;
+        
+        if (typeName instanceof SimpleName) {
+            simpleName = (SimpleName) typeName;
+        } else if (typeName instanceof QualifiedName) {
+            simpleName = ((QualifiedName) typeName).getName();
+        }
+        
+        if (simpleName == usageNode) {
+            // Check if this SimpleType is a type argument in a ParameterizedType
+            ASTNode parent = node.getParent();
+            if (parent instanceof ParameterizedType) {
+                handleTypeArgument(node, (ParameterizedType) parent);
+                return false;
+            }
+        }
+        return true;
+    }
+    
     private boolean containsNode(ASTNode parent, ASTNode target) {
         if (parent == null || target == null) {
             return false;
@@ -650,6 +674,61 @@ public class PatternMatchingVisitor extends ASTVisitor {
             nameResEdges.add(new Main.Edge(returnTypeId, varTypeId, returnTypeIdNum, varTypeIdNum));
             
             System.out.println("  Added method-return-type-to-variable-type edge: " + returnType.toString() + " -> " + varType.toString());
+        }
+    }
+    
+    private void handleTypeArgument(SimpleType typeArg, ParameterizedType paramType) {
+        System.out.println("  Pattern: SimpleName is a generic type argument");
+        
+        // Find which type argument this is
+        List<?> typeArgs = paramType.typeArguments();
+        int typeArgIndex = -1;
+        for (int i = 0; i < typeArgs.size(); i++) {
+            if (typeArgs.get(i) == typeArg) {
+                typeArgIndex = i;
+                break;
+            }
+        }
+        
+        if (typeArgIndex == -1) {
+            return;
+        }
+        
+        // Get the base type (e.g., AbstractCommand)
+        Type baseType = paramType.getType();
+        ITypeBinding baseTypeBinding = baseType.resolveBinding();
+        
+        if (baseTypeBinding == null) {
+            System.out.println("  WARNING: Could not resolve base type binding");
+            return;
+        }
+        
+        // Get the type parameters from the base class (e.g., T)
+        ITypeBinding[] typeParams = baseTypeBinding.getTypeParameters();
+        
+        if (typeArgIndex >= typeParams.length) {
+            System.out.println("  WARNING: Type argument index out of bounds");
+            return;
+        }
+        
+        // Find the TypeParameter node in the AST
+        ASTNode baseDecl = edgeAdder.findDeclaringNodeForBinding(baseTypeBinding);
+        if (baseDecl instanceof TypeDeclaration) {
+            TypeDeclaration baseTypeDecl = (TypeDeclaration) baseDecl;
+            List<?> typeParamsList = baseTypeDecl.typeParameters();
+            
+            if (typeArgIndex < typeParamsList.size()) {
+                TypeParameter typeParam = (TypeParameter) typeParamsList.get(typeArgIndex);
+                SimpleName typeParamName = typeParam.getName();
+                
+                String typeArgId = "GenericTypeArg:TypeArg:" + usageNode.toString() + "@" + usageNode.getStartPosition();
+                String typeParamId = "GenericTypeArg:TypeParam:" + typeParamName.toString() + "@" + typeParamName.getStartPosition();
+                int typeParamIdNum = typeParamName.hashCode();
+                
+                nameResEdges.add(new Main.Edge(typeArgId, typeParamId, usageIdNum, typeParamIdNum));
+                
+                System.out.println("  Added generic-type-argument-to-parameter edge: " + usageNode.toString() + " -> " + typeParamName.toString());
+            }
         }
     }
 }
