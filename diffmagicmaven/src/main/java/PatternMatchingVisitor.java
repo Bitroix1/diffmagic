@@ -67,6 +67,11 @@ public class PatternMatchingVisitor extends ASTVisitor {
             }
         }
         
+        // Check if this method invocation is the expression in a cast
+        if (parent instanceof CastExpression && methodInvocation.getName() == usageNode) {
+            handleCastMethodInvocation((CastExpression) parent, methodInvocation);
+        }
+        
         return true;
     }
     
@@ -102,6 +107,17 @@ public class PatternMatchingVisitor extends ASTVisitor {
                     handleFieldAccessLiteralAssignment(fieldAccess, assignment.getRightHandSide());
                 }
             }
+        }
+        return true;
+    }
+    
+    @Override
+    public boolean visit(CastExpression node) {
+        // Check if usageNode is the expression being cast (must be a variable)
+        Expression expression = node.getExpression();
+        if (expression == usageNode) {
+            handleCastVariable(node);
+            return false;
         }
         return true;
     }
@@ -675,6 +691,66 @@ public class PatternMatchingVisitor extends ASTVisitor {
             
             System.out.println("  Added method-return-type-to-variable-type edge: " + returnType.toString() + " -> " + varType.toString());
         }
+    }
+    
+    private void handleCastVariable(CastExpression castExpression) {
+        System.out.println("  Pattern: SimpleName is a variable in a cast expression");
+        
+        Type castType = castExpression.getType();
+        
+        IBinding binding = usageNode.resolveBinding();
+        if (!(binding instanceof IVariableBinding)) {
+            return;
+        }
+        
+        IVariableBinding varBinding = (IVariableBinding) binding;
+        ASTNode varDeclaration = edgeAdder.findDeclaringNodeForBinding(varBinding);
+        Type varType = edgeAdder.getTypeFromDeclaration(varDeclaration);
+        
+        if (varType == null) {
+            return;
+        }
+        
+        String castTypeId = "CastingTypeToType:CastType:" + castType.toString() + "@" + castType.getStartPosition();
+        int castTypeIdNum = castType.hashCode();
+        
+        String varTypeId = "CastingTypeToType:ExprType:" + varType.toString() + "@" + varType.getStartPosition();
+        int varTypeIdNum = varType.hashCode();
+        
+        nameResEdges.add(new Main.Edge(castTypeId, varTypeId, castTypeIdNum, varTypeIdNum));
+        
+        System.out.println("  Added cast-type-to-variable-type edge: " + castType.toString() + " -> " + varType.toString());
+    }
+    
+    private void handleCastMethodInvocation(CastExpression castExpression, MethodInvocation methodInvocation) {
+        System.out.println("  Pattern: SimpleName is a method in a cast expression");
+        
+        Type castType = castExpression.getType();
+        
+        IMethodBinding methodBinding = methodInvocation.resolveMethodBinding();
+        if (methodBinding == null) {
+            return;
+        }
+        
+        ASTNode methodDecl = edgeAdder.findDeclaringNodeForBinding(methodBinding);
+        if (!(methodDecl instanceof MethodDeclaration)) {
+            return;
+        }
+        
+        Type returnType = ((MethodDeclaration) methodDecl).getReturnType2();
+        if (returnType == null) {
+            return;
+        }
+        
+        String castTypeId = "CastingTypeToType:CastType:" + castType.toString() + "@" + castType.getStartPosition();
+        int castTypeIdNum = castType.hashCode();
+        
+        String returnTypeId = "CastingTypeToType:ExprType:" + returnType.toString() + "@" + returnType.getStartPosition();
+        int returnTypeIdNum = returnType.hashCode();
+        
+        nameResEdges.add(new Main.Edge(castTypeId, returnTypeId, castTypeIdNum, returnTypeIdNum));
+        
+        System.out.println("  Added cast-type-to-method-return-type edge: " + castType.toString() + " -> " + returnType.toString());
     }
     
     private void handleTypeArgument(SimpleType typeArg, ParameterizedType parameterizedType) {
