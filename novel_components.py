@@ -344,7 +344,7 @@ def filter_novel_edges(json_path: str, diff_path: str):
     # Find connected components as lists of edges
     components = find_connected_components(external_edges)
     
-    return components, unique_id_to_info
+    return components, unique_id_to_info, parent_map, novel_unique_ids
 
 
 def components_to_json_structure(components: List[List[dict]], 
@@ -397,6 +397,101 @@ def components_to_json_structure(components: List[List[dict]],
     return json_components
 
 
+def compute_node_reachability(components: List[List[dict]], 
+                              unique_id_to_info: Dict[int, dict],
+                              parent_map: Dict[int, int],
+                              novel_unique_ids: Set[int],
+                              kind: str) -> List[dict]:
+    """
+    For each component, collapse nodes to their largest novel ancestor (the colored
+    chunks), then compute how many other collapsed nodes can reach each one.
+    
+    Args:
+        components: List of connected components (lists of edge dicts with fromUniqueId/toUniqueId)
+        unique_id_to_info: Mapping from uniqueId to node information
+        parent_map: Mapping from child uniqueId to parent uniqueId
+        novel_unique_ids: Set of novel node uniqueIds
+        kind: 'Removal' or 'Addition'
+        
+    Returns:
+        List of component dicts, each containing 'kind' and 'nodes' with reachability counts
+    """
+    result_components = []
+    cache = {}
+    
+    for component_edges in components:
+        # Collapse each edge endpoint to its largest novel ancestor
+        collapsed_graph = nx.DiGraph()
+        for edge in component_edges:
+            from_collapsed = find_largest_novel_ancestor(edge['fromUniqueId'], parent_map, novel_unique_ids, cache)
+            to_collapsed = find_largest_novel_ancestor(edge['toUniqueId'], parent_map, novel_unique_ids, cache)
+            if from_collapsed != to_collapsed:  # skip self-loops
+                collapsed_graph.add_edge(from_collapsed, to_collapsed)
+            else:
+                # Still add the node even if the edge collapses to a self-loop
+                collapsed_graph.add_node(from_collapsed)
+        
+        nodes_list = []
+        for node_id in collapsed_graph.nodes():
+            # Count how many other collapsed nodes can reach this node
+            ancestors = nx.ancestors(collapsed_graph, node_id)
+            
+            info = unique_id_to_info.get(node_id, {})
+            nodes_list.append({
+                'java_id': node_id,
+                'type': f"{info.get('nodeClass', 'Unknown')} ({info.get('node_kind', 'unknown')})",
+                'content': info.get('content', 'N/A'),
+                'position': info.get('position', 'N/A'),
+                'file': info.get('file', 'Unknown'),
+                'reachable_by': len(ancestors)
+            })
+        
+        # Sort nodes: most reachable first, then by java_id for stability
+        nodes_list.sort(key=lambda n: (-n['reachable_by'], n['java_id']))
+        
+        result_components.append({
+            'kind': kind,
+            'nodes': nodes_list
+        })
+    
+    return result_components
+
+
+def create_diff_nodes(
+    lhs_results: tuple,
+    rhs_results: tuple,
+    output_path: str
+):
+    """
+    Create a JSON file with nodes per component and their reachability counts.
+    
+    Args:
+        lhs_results: Tuple of (components, unique_id_to_info) for LHS
+        rhs_results: Tuple of (components, unique_id_to_info) for RHS
+        output_path: Path for the output JSON file
+    """
+    lhs_components, lhs_unique_id_to_info, lhs_parent_map, lhs_novel_ids = lhs_results
+    rhs_components, rhs_unique_id_to_info, rhs_parent_map, rhs_novel_ids = rhs_results
+    
+    lhs_node_components = compute_node_reachability(lhs_components, lhs_unique_id_to_info, lhs_parent_map, lhs_novel_ids, 'Removal')
+    rhs_node_components = compute_node_reachability(rhs_components, rhs_unique_id_to_info, rhs_parent_map, rhs_novel_ids, 'Addition')
+    
+    all_components = lhs_node_components + rhs_node_components
+    
+    for idx, component in enumerate(all_components, start=1):
+        component['component_id'] = idx
+    
+    output = {'diff_components': all_components}
+    
+    with open(output_path, 'w') as f:
+        json.dump(output, f, indent=2)
+    
+    print(f"\nDiff nodes JSON written to {output_path}")
+    print(f"  Total components: {len(all_components)}")
+    print(f"  LHS components (removals): {len(lhs_node_components)}")
+    print(f"  RHS components (additions): {len(rhs_node_components)}")
+
+
 def create_diff_components(
     lhs_results: tuple,
     rhs_results: tuple,
@@ -410,8 +505,8 @@ def create_diff_components(
         rhs_results: Tuple of (components, unique_id_to_info) for RHS
         output_path: Path for the output JSON file
     """
-    lhs_components, lhs_unique_id_to_info = lhs_results
-    rhs_components, rhs_unique_id_to_info = rhs_results
+    lhs_components, lhs_unique_id_to_info, _, _ = lhs_results
+    rhs_components, rhs_unique_id_to_info, _, _ = rhs_results
     
     # Convert LHS and RHS components to JSON
     lhs_components_json = components_to_json_structure(lhs_components, lhs_unique_id_to_info)
@@ -419,6 +514,7 @@ def create_diff_components(
     
     # Create flat list of all components
     final_components = []
+    component_id = 1
     
     # Add all LHS components as removals
     for lhs_component in lhs_components_json:
@@ -429,7 +525,8 @@ def create_diff_components(
             component_changes.append(edge_with_kind)
         
         if component_changes:
-            final_components.append({'changes': component_changes})
+            final_components.append({'component_id': component_id, 'changes': component_changes})
+            component_id += 1
     
     # Add all RHS components as additions
     for rhs_component in rhs_components_json:
@@ -440,7 +537,8 @@ def create_diff_components(
             component_changes.append(edge_with_kind)
         
         if component_changes:
-            final_components.append({'changes': component_changes})
+            final_components.append({'component_id': component_id, 'changes': component_changes})
+            component_id += 1
     
     output = {'diff_components': final_components}
     
@@ -460,6 +558,7 @@ if __name__ == "__main__":
     rhs_json_path = os.path.join(base_path, "rhs.json")
     diff_path = os.path.join(base_path, "result.txt")
     diff_components_path = os.path.join(base_path, "diff_components.json")
+    diff_nodes_path = os.path.join(base_path, "diff_nodes.json")
     
     # Process LHS and RHS
     lhs_results = filter_novel_edges(lhs_json_path, diff_path)
@@ -467,3 +566,6 @@ if __name__ == "__main__":
     
     # Create diff_components.json with separate LHS and RHS components
     create_diff_components(lhs_results, rhs_results, diff_components_path)
+    
+    # Create diff_nodes.json with node reachability counts per component
+    create_diff_nodes(lhs_results, rhs_results, diff_nodes_path)
