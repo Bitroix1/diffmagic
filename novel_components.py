@@ -192,10 +192,13 @@ def filter_internal_edges(edges: List[dict],
         from_ancestor = find_largest_novel_ancestor(from_unique_id, parent_map, novel_unique_ids, cache)
         to_ancestor = find_largest_novel_ancestor(to_unique_id, parent_map, novel_unique_ids, cache)
         
-        # Skip edges where both endpoints have the same novel ancestor (internal edges)
+        # Skip edges where both endpoints are contained within the same novel ancestor,
+        # BUT keep edges where one endpoint IS the ancestor itself (structural parent edges
+        # like FragmentToStmt that connect a child to its novel parent node).
         if from_ancestor == to_ancestor:
-            print(f"  Filtered internal edge: {from_unique_id} -> {to_unique_id} (both inside {from_ancestor})")
-            continue
+            if from_unique_id != from_ancestor and to_unique_id != to_ancestor:
+                print(f"  Filtered internal edge: {from_unique_id} -> {to_unique_id} (both inside {from_ancestor})")
+                continue
         
         filtered_edges.append(edge)
     
