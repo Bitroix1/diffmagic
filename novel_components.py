@@ -1,10 +1,11 @@
 import json
 import re
+from functools import reduce
 from typing import Dict, Set, List
 import networkx as nx
 
 
-def parse_diff_file(diff_path: str) -> Set[int]:
+def parse_diff_file_novels(diff_path: str) -> Set[int]:
     """
     Parse the diff file and extract all Java uniqueIds marked as Novel.
     
@@ -28,6 +29,27 @@ def parse_diff_file(diff_path: str) -> Set[int]:
     
     return novel_ids
 
+
+def parse_diff_file_unchangeds(diff_path: str) -> Dict[int,int]:
+    """
+    Parse the diff file and extract all pairs of Java uniqueIds that are matched.
+
+    Args:
+        diff_path: Path to the diff text file
+    """
+    paired_ids = dict()
+
+    with open(diff_path, 'r') as f:
+        content = f.readlines()
+
+    # Extract all Novel entries (format: "number: Novel")
+    unchanged_pattern = r'^(\d+): Unchanged\(ID: (\d+)\),\s$' #r'(\d+):\s*Novel'
+    for line in content:
+        match = re.match(unchanged_pattern,line)
+        if match:
+            paired_ids[int(match[1])] = int(match[2])
+
+    return paired_ids
 
 def build_node_mappings(syntax_tree: dict) -> Dict[int, dict]:
     """
@@ -191,7 +213,7 @@ def filter_internal_edges(edges: List[dict],
         # Find largest novel ancestor for both endpoints
         from_ancestor = find_largest_novel_ancestor(from_unique_id, parent_map, novel_unique_ids, cache)
         to_ancestor = find_largest_novel_ancestor(to_unique_id, parent_map, novel_unique_ids, cache)
-        
+
         # Skip edges where both endpoints are contained within the same novel ancestor,
         # BUT keep edges where one endpoint IS the ancestor itself (structural parent edges
         # like FragmentToStmt that connect a child to its novel parent node).
@@ -302,7 +324,7 @@ def filter_novel_edges(json_path: str, diff_path: str):
         data = json.load(f)
     
     # Parse novel Java uniqueIds from result.txt
-    novel_unique_ids = parse_diff_file(diff_path)
+    novel_unique_ids = parse_diff_file_novels(diff_path)
     
     # Build node info mapping
     unique_id_to_info = build_node_mappings(data.get('syntax', {}))
@@ -397,7 +419,7 @@ def components_to_json_structure(components: List[List[dict]],
     return json_components
 
 
-def compute_node_reachability(components: List[List[dict]], 
+def compute_node_reachability(components: List[List[dict]],
                               unique_id_to_info: Dict[int, dict],
                               parent_map: Dict[int, int],
                               novel_unique_ids: Set[int],
@@ -405,20 +427,20 @@ def compute_node_reachability(components: List[List[dict]],
     """
     For each component, collapse nodes to their largest novel ancestor (the colored
     chunks), then compute how many other collapsed nodes can reach each one.
-    
+
     Args:
         components: List of connected components (lists of edge dicts with fromUniqueId/toUniqueId)
         unique_id_to_info: Mapping from uniqueId to node information
         parent_map: Mapping from child uniqueId to parent uniqueId
         novel_unique_ids: Set of novel node uniqueIds
         kind: 'Removal' or 'Addition'
-        
+
     Returns:
         List of component dicts, each containing 'kind' and 'nodes' with reachability counts
     """
     result_components = []
     cache = {}
-    
+
     for component_edges in components:
         # Collapse each edge endpoint to its largest novel ancestor
         collapsed_graph = nx.DiGraph()
@@ -430,12 +452,12 @@ def compute_node_reachability(components: List[List[dict]],
             else:
                 # Still add the node even if the edge collapses to a self-loop
                 collapsed_graph.add_node(from_collapsed)
-        
+
         nodes_list = []
         for node_id in collapsed_graph.nodes():
             # Count how many other collapsed nodes can reach this node
             ancestors = nx.ancestors(collapsed_graph, node_id)
-            
+
             info = unique_id_to_info.get(node_id, {})
             nodes_list.append({
                 'java_id': node_id,
@@ -445,26 +467,26 @@ def compute_node_reachability(components: List[List[dict]],
                 'file': info.get('file', 'Unknown'),
                 'reachable_by': len(ancestors)
             })
-        
+
         # Sort nodes: most reachable first, then by java_id for stability
         nodes_list.sort(key=lambda n: (-n['reachable_by'], n['java_id']))
-        
+
         result_components.append({
             'kind': kind,
             'nodes': nodes_list
         })
-    
+
     return result_components
 
 
 def create_diff_nodes(
-    lhs_results: tuple,
-    rhs_results: tuple,
-    output_path: str
+        lhs_results: tuple,
+        rhs_results: tuple,
+        output_path: str
 ):
     """
     Create a JSON file with nodes per component and their reachability counts.
-    
+
     Args:
         lhs_results: Tuple of (components, unique_id_to_info) for LHS
         rhs_results: Tuple of (components, unique_id_to_info) for RHS
@@ -472,20 +494,22 @@ def create_diff_nodes(
     """
     lhs_components, lhs_unique_id_to_info, lhs_parent_map, lhs_novel_ids = lhs_results
     rhs_components, rhs_unique_id_to_info, rhs_parent_map, rhs_novel_ids = rhs_results
-    
-    lhs_node_components = compute_node_reachability(lhs_components, lhs_unique_id_to_info, lhs_parent_map, lhs_novel_ids, 'Removal')
-    rhs_node_components = compute_node_reachability(rhs_components, rhs_unique_id_to_info, rhs_parent_map, rhs_novel_ids, 'Addition')
-    
+
+    lhs_node_components = compute_node_reachability(lhs_components, lhs_unique_id_to_info, lhs_parent_map,
+                                                    lhs_novel_ids, 'Removal')
+    rhs_node_components = compute_node_reachability(rhs_components, rhs_unique_id_to_info, rhs_parent_map,
+                                                    rhs_novel_ids, 'Addition')
+
     all_components = lhs_node_components + rhs_node_components
-    
+
     for idx, component in enumerate(all_components, start=1):
         component['component_id'] = idx
-    
+
     output = {'diff_components': all_components}
-    
+
     with open(output_path, 'w') as f:
         json.dump(output, f, indent=2)
-    
+
     print(f"\nDiff nodes JSON written to {output_path}")
     print(f"  Total components: {len(all_components)}")
     print(f"  LHS components (removals): {len(lhs_node_components)}")
@@ -495,6 +519,7 @@ def create_diff_nodes(
 def create_diff_components(
     lhs_results: tuple,
     rhs_results: tuple,
+    unify_comps: list,
     output_path: str
 ):
     """
@@ -503,6 +528,7 @@ def create_diff_components(
     Args:
         lhs_results: Tuple of (components, unique_id_to_info) for LHS
         rhs_results: Tuple of (components, unique_id_to_info) for RHS
+        unify_comps: List of (unique_id,unique_id) of lhs/rhs nodes that should be in the same component
         output_path: Path for the output JSON file
     """
     lhs_components, lhs_unique_id_to_info, _, _ = lhs_results
@@ -553,7 +579,7 @@ def create_diff_components(
 
 if __name__ == "__main__":
     import os
-    base_path = os.path.join(os.path.dirname(__file__), "..", "difftastic", "Files")
+    base_path = "."
     lhs_json_path = os.path.join(base_path, "lhs.json")
     rhs_json_path = os.path.join(base_path, "rhs.json")
     diff_path = os.path.join(base_path, "result.txt")
@@ -563,9 +589,93 @@ if __name__ == "__main__":
     # Process LHS and RHS
     lhs_results = filter_novel_edges(lhs_json_path, diff_path)
     rhs_results = filter_novel_edges(rhs_json_path, diff_path)
-    
+
+    novels = parse_diff_file_novels(diff_path)
+
+    pairs = parse_diff_file_unchangeds(diff_path)
+
+
+
+
+    with open(lhs_json_path, 'r') as f:
+        lhs_tree = json.load(f)['syntax']
+    with open(rhs_json_path, 'r') as f:
+        rhs_tree = json.load(f)['syntax']
+
+    def find_id(tree: dict, id: int) -> (dict | None, dict | None):
+        def find_id_internal(tree: dict, parent: dict) -> (dict | None, dict | None):
+            if tree['uniqueId'] == id:
+                return (tree, parent)
+            else:
+                if 'children' not in tree:
+                    return (None, None)
+                for child in tree['children']:
+                    (node,parent) = find_id_internal(child,tree)
+                    if node:
+                        return (node, parent)
+                return (None, None)
+
+        for cu in tree.values():
+            (node,parent) = find_id_internal(cu, None)
+            if node:
+                return (node, parent)
+        return (None, None)
+
+    def get_sinks(component: List[dict]) -> set[int]:
+        froms = set(e['fromUniqueId'] for e in component)
+        return set(e['toUniqueId'] for e in component if e['toUniqueId'] not in froms)
+
+    # for lhs_comp in lhs_results[0]:
+    #     sinks = get_sinks(lhs_comp)
+    def get_matches(first: list[dict],second: list[dict], matches:dict[int,int]) -> list[(int,int)]:
+        '''
+        Match two lists with a matching dict `matches`,
+        :returns: the indices that match in each list
+        '''
+        fidx = 0
+        sidx = 0
+        res = []
+        while fidx < len(first) and sidx < len(second):
+            if first[fidx]['uniqueId'] in matches:
+                if second[sidx]['uniqueId'] == matches[first[fidx]['uniqueId']]:
+                    res.append((fidx,sidx))
+                    fidx += 1
+
+                else:
+                    assert second[sidx]['uniqueId'] not in matches
+                sidx += 1
+            else:
+                fidx += 1
+        return [(-1,-1)] + res + [(len(first),len(second))]
+
+
+    rhs_all_sinks = reduce(lambda s1,s2: s1.union(s2), (get_sinks(c) for c in rhs_results[0]), set())
+    lhs_all_sinks = reduce(lambda s1,s2: s1.union(s2), (get_sinks(c) for c in lhs_results[0]), set())
+
+    unify_comps = []
+    # We're looking for symmetrical things so you can only do it on one side and not the other, right?
+    for rhs_comp in rhs_results[0]:
+        sinks = get_sinks(rhs_comp)
+
+        for sink_id in sinks:
+            (node,parent) = find_id(rhs_tree, sink_id)
+            assert node
+            for child in (node['children'] if 'children' in node else []):
+                if child['uniqueId'] in pairs:
+                    #if novel on the other side, if not:
+                    pass
+            if parent and parent['uniqueId'] in pairs:
+                parent_match_id = pairs[parent['uniqueId']]
+                (parent_match,_) = find_id(lhs_tree,parent_match_id)
+                alignments = get_matches(parent['children'],parent_match['children'],pairs)
+                for (start,end) in zip(alignments, alignments[1:]):
+                    range_this = (n['uniqueId'] for n in  parent['children'][start[0]+1:end[0]] if n['uniqueId'] in rhs_all_sinks)
+                    range_match = (n['uniqueId'] for n in parent_match['children'][start[1]+1:end[1]] if n['uniqueId'] in lhs_all_sinks)
+                    unify_comps.extend(zip(range_this,range_match))
+
+
     # Create diff_components.json with separate LHS and RHS components
-    create_diff_components(lhs_results, rhs_results, diff_components_path)
-    
+    create_diff_components(lhs_results, rhs_results, unify_comps, diff_components_path)
+
     # Create diff_nodes.json with node reachability counts per component
     create_diff_nodes(lhs_results, rhs_results, diff_nodes_path)
