@@ -2498,7 +2498,7 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(StringLiteral node) {
 		syntaxMap = new HashMap<>();
-		String content = node.getLiteralValue();
+		String content = node.getEscapedValue();
 
 		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
 		syntaxMap.put("kind", "String(StringLiteral)");
