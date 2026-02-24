@@ -482,14 +482,17 @@ def compute_node_reachability(components: List[List[dict]],
 def create_diff_nodes(
         lhs_results: tuple,
         rhs_results: tuple,
+        unify_comps: list,
         output_path: str
 ):
     """
     Create a JSON file with nodes per component and their reachability counts.
+    Components are merged based on unify_comps links.
 
     Args:
-        lhs_results: Tuple of (components, unique_id_to_info) for LHS
-        rhs_results: Tuple of (components, unique_id_to_info) for RHS
+        lhs_results: Tuple of (components, unique_id_to_info, parent_map, novel_ids) for LHS
+        rhs_results: Tuple of (components, unique_id_to_info, parent_map, novel_ids) for RHS
+        unify_comps: List of (rhs_id, lhs_id) tuples indicating nodes that should be in same component
         output_path: Path for the output JSON file
     """
     lhs_components, lhs_unique_id_to_info, lhs_parent_map, lhs_novel_ids = lhs_results
@@ -500,8 +503,70 @@ def create_diff_nodes(
     rhs_node_components = compute_node_reachability(rhs_components, rhs_unique_id_to_info, rhs_parent_map,
                                                     rhs_novel_ids, 'Addition')
 
-    all_components = lhs_node_components + rhs_node_components
+    # Add 'kind' field to each node
+    for comp in lhs_node_components:
+        for node in comp['nodes']:
+            node['kind'] = 'Removal'
+    
+    for comp in rhs_node_components:
+        for node in comp['nodes']:
+            node['kind'] = 'Addition'
 
+    # Build collapsed node to component index mapping
+    lhs_node_to_comp = {}
+    for comp_idx, component in enumerate(lhs_node_components):
+        for node in component['nodes']:
+            lhs_node_to_comp[node['java_id']] = comp_idx
+    
+    rhs_node_to_comp = {}
+    for comp_idx, component in enumerate(rhs_node_components):
+        for node in component['nodes']:
+            rhs_node_to_comp[node['java_id']] = comp_idx
+    
+    # Union-find to merge components
+    parent = list(range(len(lhs_node_components) + len(rhs_node_components)))
+    
+    def find(x):
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+    
+    def union(x, y):
+        px, py = find(x), find(y)
+        if px != py:
+            parent[px] = py
+    
+    # Merge components based on unify_comps (these need to be collapsed to largest novel ancestor)
+    cache = {}
+    for rhs_id, lhs_id in unify_comps:
+        # Collapse to largest novel ancestor
+        rhs_collapsed = find_largest_novel_ancestor(rhs_id, rhs_parent_map, rhs_novel_ids, cache)
+        lhs_collapsed = find_largest_novel_ancestor(lhs_id, lhs_parent_map, lhs_novel_ids, cache)
+        
+        if rhs_collapsed in rhs_node_to_comp and lhs_collapsed in lhs_node_to_comp:
+            rhs_comp_idx = rhs_node_to_comp[rhs_collapsed] + len(lhs_node_components)
+            lhs_comp_idx = lhs_node_to_comp[lhs_collapsed]
+            union(lhs_comp_idx, rhs_comp_idx)
+    
+    # Group components by their root
+    merged_components = {}
+    for idx in range(len(parent)):
+        root = find(idx)
+        if root not in merged_components:
+            merged_components[root] = []
+        
+        if idx < len(lhs_node_components):
+            merged_components[root].extend(lhs_node_components[idx]['nodes'])
+        else:
+            merged_components[root].extend(rhs_node_components[idx - len(lhs_node_components)]['nodes'])
+    
+    # Create final output
+    all_components = []
+    for comp_nodes in merged_components.values():
+        all_components.append({
+            'nodes': comp_nodes
+        })
+    
     for idx, component in enumerate(all_components, start=1):
         component['component_id'] = idx
 
@@ -511,9 +576,9 @@ def create_diff_nodes(
         json.dump(output, f, indent=2)
 
     print(f"\nDiff nodes JSON written to {output_path}")
-    print(f"  Total components: {len(all_components)}")
-    print(f"  LHS components (removals): {len(lhs_node_components)}")
-    print(f"  RHS components (additions): {len(rhs_node_components)}")
+    print(f"  Total components after merging: {len(all_components)}")
+    print(f"  Original LHS components: {len(lhs_node_components)}")
+    print(f"  Original RHS components: {len(rhs_node_components)}")
 
 
 def create_diff_components(
@@ -523,12 +588,13 @@ def create_diff_components(
     output_path: str
 ):
     """
-    Create the final diff_components JSON with separate LHS (Removal) and RHS (Addition) changes.
+    Create the final diff_components JSON with LHS (Removal) and RHS (Addition) changes.
+    Components are merged based on unify_comps links.
     
     Args:
-        lhs_results: Tuple of (components, unique_id_to_info) for LHS
-        rhs_results: Tuple of (components, unique_id_to_info) for RHS
-        unify_comps: List of (unique_id,unique_id) of lhs/rhs nodes that should be in the same component
+        lhs_results: Tuple of (components, unique_id_to_info, ...) for LHS
+        rhs_results: Tuple of (components, unique_id_to_info, ...) for RHS
+        unify_comps: List of (rhs_id, lhs_id) tuples indicating nodes that should be in same component
         output_path: Path for the output JSON file
     """
     lhs_components, lhs_unique_id_to_info, _, _ = lhs_results
@@ -538,29 +604,72 @@ def create_diff_components(
     lhs_components_json = components_to_json_structure(lhs_components, lhs_unique_id_to_info)
     rhs_components_json = components_to_json_structure(rhs_components, rhs_unique_id_to_info)
     
-    # Create flat list of all components
+    # Build node to component index mapping
+    lhs_node_to_comp = {}
+    for comp_idx, component in enumerate(lhs_components_json):
+        for edge in component:
+            lhs_node_to_comp[edge['from']['java_id']] = comp_idx
+            lhs_node_to_comp[edge['to']['java_id']] = comp_idx
+    
+    rhs_node_to_comp = {}
+    for comp_idx, component in enumerate(rhs_components_json):
+        for edge in component:
+            rhs_node_to_comp[edge['from']['java_id']] = comp_idx
+            rhs_node_to_comp[edge['to']['java_id']] = comp_idx
+    
+    # Union-find to merge components
+    # Each component gets a unique ID: lhs components are 0..len(lhs)-1, rhs are len(lhs)..len(lhs)+len(rhs)-1
+    parent = list(range(len(lhs_components_json) + len(rhs_components_json)))
+    
+    def find(x):
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+    
+    def union(x, y):
+        px, py = find(x), find(y)
+        if px != py:
+            parent[px] = py
+    
+    # Merge components based on unify_comps
+    for rhs_id, lhs_id in unify_comps:
+        if rhs_id in rhs_node_to_comp and lhs_id in lhs_node_to_comp:
+            rhs_comp_idx = rhs_node_to_comp[rhs_id] + len(lhs_components_json)
+            lhs_comp_idx = lhs_node_to_comp[lhs_id]
+            union(lhs_comp_idx, rhs_comp_idx)
+    
+    # Group components by their root
+    merged_components = {}
+    for idx in range(len(parent)):
+        root = find(idx)
+        if root not in merged_components:
+            merged_components[root] = {'lhs': [], 'rhs': []}
+        
+        if idx < len(lhs_components_json):
+            merged_components[root]['lhs'].append(lhs_components_json[idx])
+        else:
+            merged_components[root]['rhs'].append(rhs_components_json[idx - len(lhs_components_json)])
+    
+    # Create final output
     final_components = []
     component_id = 1
     
-    # Add all LHS components as removals
-    for lhs_component in lhs_components_json:
+    for comp_data in merged_components.values():
         component_changes = []
-        for edge in lhs_component:
-            edge_with_kind = edge.copy()
-            edge_with_kind['kind'] = 'Removal'
-            component_changes.append(edge_with_kind)
         
-        if component_changes:
-            final_components.append({'component_id': component_id, 'changes': component_changes})
-            component_id += 1
-    
-    # Add all RHS components as additions
-    for rhs_component in rhs_components_json:
-        component_changes = []
-        for edge in rhs_component:
-            edge_with_kind = edge.copy()
-            edge_with_kind['kind'] = 'Addition'
-            component_changes.append(edge_with_kind)
+        # Add all LHS edges as removals
+        for lhs_component in comp_data['lhs']:
+            for edge in lhs_component:
+                edge_with_kind = edge.copy()
+                edge_with_kind['kind'] = 'Removal'
+                component_changes.append(edge_with_kind)
+        
+        # Add all RHS edges as additions
+        for rhs_component in comp_data['rhs']:
+            for edge in rhs_component:
+                edge_with_kind = edge.copy()
+                edge_with_kind['kind'] = 'Addition'
+                component_changes.append(edge_with_kind)
         
         if component_changes:
             final_components.append({'component_id': component_id, 'changes': component_changes})
@@ -572,14 +681,14 @@ def create_diff_components(
         json.dump(output, f, indent=2)
     
     print(f"\nDiff components JSON written to {output_path}")
-    print(f"  Total components: {len(final_components)}")
-    print(f"  LHS components (removals): {len(lhs_components_json)}")
-    print(f"  RHS components (additions): {len(rhs_components_json)}")
+    print(f"  Total components after merging: {len(final_components)}")
+    print(f"  Original LHS components: {len(lhs_components_json)}")
+    print(f"  Original RHS components: {len(rhs_components_json)}")
 
 
 if __name__ == "__main__":
     import os
-    base_path = "."
+    base_path = os.path.join(os.path.dirname(__file__), "..", "difftastic", "Files")
     lhs_json_path = os.path.join(base_path, "lhs.json")
     rhs_json_path = os.path.join(base_path, "rhs.json")
     diff_path = os.path.join(base_path, "result.txt")
@@ -674,8 +783,8 @@ if __name__ == "__main__":
                     unify_comps.extend(zip(range_this,range_match))
 
 
-    # Create diff_components.json with separate LHS and RHS components
+    # Create diff_components.json with merged components based on unify_comps
     create_diff_components(lhs_results, rhs_results, unify_comps, diff_components_path)
 
-    # Create diff_nodes.json with node reachability counts per component
-    create_diff_nodes(lhs_results, rhs_results, diff_nodes_path)
+    # Create diff_nodes.json with node reachability counts per merged component
+    create_diff_nodes(lhs_results, rhs_results, unify_comps, diff_nodes_path)
