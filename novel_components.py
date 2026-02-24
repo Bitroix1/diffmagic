@@ -581,10 +581,70 @@ def create_diff_nodes(
     print(f"  Original RHS components: {len(rhs_node_components)}")
 
 
+def generate_rename_name(
+        lhs_node: dict, lhs_parent: dict, lhs_tree: dict,
+        rhs_node: dict, rhs_parent: dict, rhs_tree: dict) -> str:
+    parent_class = lhs_parent['nodeClass']
+    assert(lhs_node['nodeClass'] == 'SimpleName' and rhs_node['nodeClass'] == 'SimpleName')
+    lhs_name = lhs_node['content']
+    rhs_name = rhs_node['content']
+    if parent_class == 'TypeDeclaration':
+        renamed_kind = 'type'
+    elif parent_class == 'VariableDeclarationFragment':
+        renamed_kind = 'variable'
+    elif parent_class == 'SingleVariableDeclaration':
+        _, lhs_grandparent = find_id(lhs_tree, lhs_parent['uniqueId'])
+        assert lhs_grandparent['nodeClass'] == 'Structural'
+        _, lhs_greatgrandparent = find_id(lhs_tree, lhs_grandparent['uniqueId'])
+        grandparent_class = lhs_greatgrandparent['nodeClass']
+        if grandparent_class == 'MethodDeclaration':
+            assert lhs_greatgrandparent['children'][0]['nodeClass'] == 'SimpleName'
+            method_name = lhs_greatgrandparent['children'][0]['content']
+            renamed_kind = f'parameter of method {method_name}'
+        else:
+            assert False, grandparent_class
+    elif parent_class == 'MethodDeclaration':
+        renamed_kind = 'method'
+    else:
+        assert False, parent_class
+    return f"{renamed_kind} renamed from {lhs_name} to {rhs_name}"
+
+def generate_addrem_name(node: dict, add: bool) -> str:
+    action = 'added' if add else 'removed'
+    node_class = node['nodeClass']
+    if node_class == 'VariableDeclarationStatement':
+        added_kind = 'variable'
+        name_loc = node['children'][1]['children'][0]['children'][0]
+    elif node_class == 'MethodDeclaration':
+        added_kind = 'method'
+        name_loc = node['children'][0]
+    elif node_class == 'PrimitiveType': #TODO kill me
+        added_kind = ''
+        _, parent = find_id(rhs_tree, node['uniqueId'])
+        assert parent['nodeClass'] == 'VariableDeclarationStatement'
+        name_loc = parent['children'][1]['children'][0]['children'][0]
+    elif node_class == node_class == 'SimpleType': #TODO kill me too
+        added_kind = ''
+        _, parent = find_id(lhs_tree, node['uniqueId'])
+        assert parent['nodeClass'] == 'FieldDeclaration'
+        name_loc = parent['children'][0]['children'][0]['children'][0]
+    elif node_class == 'FieldDeclaration':
+        added_kind = 'field'
+        name_loc = node['children'][0]['children'][0]['children'][0]
+    elif node_class == 'SingleVariableDeclaration':
+        added_kind = 'parameter'
+        name_loc = node['children'][0]
+    else:
+        assert False, node_class
+    assert name_loc['nodeClass'] == 'SimpleName'
+    return f'{added_kind} {name_loc['content']} {action}'
+
 def create_diff_components(
     lhs_results: tuple,
     rhs_results: tuple,
     unify_comps: list,
+    lhs_tree: dict,
+    rhs_tree: dict,
     output_path: str
 ):
     """
@@ -644,7 +704,6 @@ def create_diff_components(
         root = find(idx)
         if root not in merged_components:
             merged_components[root] = {'lhs': [], 'rhs': []}
-        
         if idx < len(lhs_components_json):
             merged_components[root]['lhs'].append(lhs_components_json[idx])
         else:
@@ -670,9 +729,61 @@ def create_diff_components(
                 edge_with_kind = edge.copy()
                 edge_with_kind['kind'] = 'Addition'
                 component_changes.append(edge_with_kind)
-        
+
+        def get_kind() -> str:
+            if comp_data['lhs'] and comp_data['rhs']:
+                return 'rename'
+            elif comp_data['lhs']:
+                return 'delete'
+            else:
+                return 'add'
+
+        def get_all_ancestors(tree: dict, node: dict) -> list[dict]:
+            res = []
+            while node:
+                node, parent = find_id(tree, node['uniqueId'])
+                if parent: res.append(parent)
+                node = parent
+            return res
+
         if component_changes:
-            final_components.append({'component_id': component_id, 'changes': component_changes})
+            component_kind = get_kind()
+            component_names = []
+            tos = {c['to']['java_id'] for c in component_changes}
+            if component_kind == 'rename':
+                # find the matched sink(s)
+                sinks_matched = list(filter(lambda sinks: sinks[0] in tos or sinks[1] in tos, unify_comps))
+                for (rhs_sink, lhs_sink) in sinks_matched:
+                    rhs_node, rhs_parent = find_id(rhs_tree,rhs_sink)
+                    lhs_node, lhs_parent = find_id(lhs_tree,lhs_sink)
+                    component_names.append(generate_rename_name(lhs_node, lhs_parent, lhs_tree, rhs_node, rhs_parent, rhs_tree))
+            elif component_kind == 'add':
+                added_sinks = set(filter(lambda x: x in tos, unmatched_sinks))
+                for added_sink in added_sinks:
+                    rhs_node, rhs_parent = find_id(rhs_tree, added_sink)
+                    ancestors = [rhs_parent] + get_all_ancestors(rhs_tree, rhs_parent)
+                    if set(a['uniqueId'] for a in ancestors).intersection(added_sinks):
+                        continue
+                    component_names.append(generate_addrem_name(rhs_node, True))
+            elif component_kind == 'delete':
+                del_sinks = set(filter(lambda x: x in tos, unmatched_sinks))
+                for del_sink in del_sinks:
+                    lhs_node, lhs_parent = find_id(lhs_tree, del_sink)
+                    ancestors = [lhs_parent] + get_all_ancestors(lhs_tree, lhs_parent)
+                    if set(a['uniqueId'] for a in ancestors).intersection(del_sinks):
+                        continue
+                    component_names.append(generate_addrem_name(lhs_node, False))
+            else:
+                raise Exception()
+
+            final_component_name = ', '.join(component_names)
+            final_component_name = final_component_name[0].upper() + final_component_name[1:] if final_component_name else ''
+            final_components.append({
+                'component_id': component_id,
+                'component_name': final_component_name,
+                'component_kind': component_kind,
+                'changes': component_changes
+            })
             component_id += 1
     
     output = {'diff_components': final_components}
@@ -782,9 +893,12 @@ if __name__ == "__main__":
                     range_match = (n['uniqueId'] for n in parent_match['children'][start[1]+1:end[1]] if n['uniqueId'] in lhs_all_sinks)
                     unify_comps.extend(zip(range_this,range_match))
 
+    unmatched_sinks = set()
+    unmatched_sinks.update(filter(lambda s: s not in [c[1] for c in unify_comps], lhs_all_sinks))
+    unmatched_sinks.update(filter(lambda s: s not in [c[0] for c in unify_comps], rhs_all_sinks))
 
     # Create diff_components.json with merged components based on unify_comps
-    create_diff_components(lhs_results, rhs_results, unify_comps, diff_components_path)
+    create_diff_components(lhs_results, rhs_results, unify_comps, lhs_tree, rhs_tree, diff_components_path)
 
     # Create diff_nodes.json with node reachability counts per merged component
     create_diff_nodes(lhs_results, rhs_results, unify_comps, diff_nodes_path)
