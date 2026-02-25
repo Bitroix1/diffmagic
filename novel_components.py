@@ -618,21 +618,22 @@ def generate_addrem_name(node: dict, add: bool) -> str:
     elif node_class == 'MethodDeclaration':
         added_kind = 'method'
         name_loc = node['children'][0]
-    elif node_class == 'PrimitiveType': #TODO kill me
+    elif node_class == 'PrimitiveType' or node_class == node_class == 'SimpleType': #TODO kill me
         added_kind = ''
         _, parent = find_id(rhs_tree, node['uniqueId'])
-        assert parent['nodeClass'] == 'VariableDeclarationStatement'
-        name_loc = parent['children'][1]['children'][0]['children'][0]
-    elif node_class == node_class == 'SimpleType': #TODO kill me too
-        added_kind = ''
-        _, parent = find_id(lhs_tree, node['uniqueId'])
-        assert parent['nodeClass'] == 'FieldDeclaration'
-        name_loc = parent['children'][0]['children'][0]['children'][0]
+        assert parent['nodeClass'] == 'VariableDeclarationStatement' or parent['nodeClass'] == 'FieldDeclaration'
+        if parent['nodeClass'] == 'VariableDeclarationStatement':
+            name_loc = parent['children'][1]['children'][0]['children'][0]
+        else:
+            name_loc = parent['children'][0]['children'][0]['children'][0]
     elif node_class == 'FieldDeclaration':
         added_kind = 'field'
         name_loc = node['children'][0]['children'][0]['children'][0]
     elif node_class == 'SingleVariableDeclaration':
         added_kind = 'parameter'
+        name_loc = node['children'][0]
+    elif node_class == 'TypeParameter':
+        added_kind = 'type parameter'
         name_loc = node['children'][0]
     else:
         assert False, node_class
@@ -799,7 +800,7 @@ def create_diff_components(
 
 if __name__ == "__main__":
     import os
-    base_path = os.path.join(os.path.dirname(__file__), "..", "difftastic", "Files")
+    base_path = '.' #os.path.join(os.path.dirname(__file__), "..", "difftastic", "Files")
     lhs_json_path = os.path.join(base_path, "lhs.json")
     rhs_json_path = os.path.join(base_path, "rhs.json")
     diff_path = os.path.join(base_path, "result.txt")
