@@ -620,7 +620,7 @@ def generate_addrem_name(node: dict, add: bool) -> str:
         name_loc = node['children'][0]
     elif node_class == 'PrimitiveType' or node_class == node_class == 'SimpleType': #TODO kill me
         added_kind = ''
-        _, parent = find_id(rhs_tree, node['uniqueId'])
+        _, parent = find_id(rhs_tree if add else lhs_tree, node['uniqueId'])
         assert parent['nodeClass'] == 'VariableDeclarationStatement' or parent['nodeClass'] == 'FieldDeclaration'
         if parent['nodeClass'] == 'VariableDeclarationStatement':
             name_loc = parent['children'][1]['children'][0]['children'][0]
