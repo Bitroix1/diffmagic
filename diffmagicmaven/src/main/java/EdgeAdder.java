@@ -31,7 +31,7 @@ public class EdgeAdder {
         			simpleName = (SimpleName)node.getName();
         		}
         		importsMap.put(simpleName.getIdentifier(), node);
-        		return false;
+        		return true;
         	}
         	
             @Override
