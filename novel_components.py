@@ -635,9 +635,12 @@ def generate_addrem_name(node: dict, add: bool) -> str:
     elif node_class == 'TypeParameter':
         added_kind = 'type parameter'
         name_loc = node['children'][0]
+    elif node_class == 'ImportDeclaration':
+        added_kind = 'import'
+        name_loc = node['children'][0]
     else:
         assert False, node_class
-    assert name_loc['nodeClass'] == 'SimpleName'
+    assert name_loc['nodeClass'] == 'SimpleName' or name_loc['nodeClass'] == 'QualifiedName' #TODO, fix
     return f'{added_kind} {name_loc['content']} {action}'
 
 def create_diff_components(
