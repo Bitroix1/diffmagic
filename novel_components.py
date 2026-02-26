@@ -635,6 +635,14 @@ def generate_addrem_name(node: dict, add: bool) -> str:
     elif node_class == 'TypeParameter':
         added_kind = 'type parameter'
         name_loc = node['children'][0]
+        tree = rhs_tree if add else lhs_tree
+        _, tp_parent = find_id(tree, node['uniqueId'])
+        if tp_parent and tp_parent['nodeClass'] == 'Structural':
+            _, tp_grandparent = find_id(tree, tp_parent['uniqueId'])
+            if tp_grandparent and tp_grandparent['nodeClass'] in ('TypeDeclaration', 'MethodDeclaration'):
+                owner_name = tp_grandparent['children'][0]['content']
+                assert name_loc['nodeClass'] == 'SimpleName'
+                return f'{added_kind} {name_loc['content']} {action} in {owner_name}'
     elif node_class == 'ImportDeclaration':
         added_kind = 'import'
         name_loc = node['children'][0]
