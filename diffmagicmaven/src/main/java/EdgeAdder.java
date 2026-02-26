@@ -1,6 +1,8 @@
 import org.eclipse.jdt.core.dom.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class EdgeAdder {
     private List<Main.Edge> nameResEdges;
@@ -16,7 +18,22 @@ public class EdgeAdder {
     }
     
     public void addEdgesForCompilationUnit(CompilationUnit compilationUnit) {
+    	final Map<String, ImportDeclaration> importsMap = new HashMap<>();
         compilationUnit.accept(new ASTVisitor() {
+        	@Override
+        	public boolean visit(ImportDeclaration node) {
+        		if (node.isOnDemand()) return false;
+        		SimpleName simpleName = null;
+        		if (node.getName().isQualifiedName()) {
+        			simpleName = ((QualifiedName)node.getName()).getName();
+        		}
+        		else {
+        			simpleName = (SimpleName)node.getName();
+        		}
+        		importsMap.put(simpleName.getIdentifier(), node);
+        		return false;
+        	}
+        	
             @Override
             public boolean visit(SimpleName node) {
                 IBinding binding = node.resolveBinding();
@@ -36,6 +53,15 @@ public class EdgeAdder {
                     }
                 } else {
                     System.out.println("No binding for SimpleName: '" + node.getIdentifier() + "' at position " + node.getStartPosition());
+                    if (importsMap.containsKey(node.getIdentifier())) {
+                    	System.out.println("Found " + node.getIdentifier() + " in imports instead");
+                    	ImportDeclaration declaringName = importsMap.get(node.getIdentifier());
+                    	String usageId = "NameRes:SimpleName:" + node.toString() + "@" + node.getStartPosition();
+                        int usageIdNum = node.hashCode();
+                        String simpleNameDefId = "ImportDeclaration:" + declaringName.getName().toString() + "@" + declaringName.getStartPosition();
+                        int simpleNameDefIdNum = declaringName.hashCode();
+                        nameResEdges.add(new Main.Edge(usageId, simpleNameDefId, usageIdNum, simpleNameDefIdNum));
+                    }
                 }
                 return super.visit(node);
             }
