@@ -800,7 +800,7 @@ def create_diff_components(
 
 if __name__ == "__main__":
     import os
-    base_path = '.' #os.path.join(os.path.dirname(__file__), "..", "difftastic", "Files")
+    base_path = os.path.join(os.path.dirname(__file__), "..", "difftastic", "Files")
     lhs_json_path = os.path.join(base_path, "lhs.json")
     rhs_json_path = os.path.join(base_path, "rhs.json")
     diff_path = os.path.join(base_path, "result.txt")
