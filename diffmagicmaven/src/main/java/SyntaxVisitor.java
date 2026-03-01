@@ -87,10 +87,40 @@ public class SyntaxVisitor extends ASTVisitor {
     /**
      * Create a List element for a delimiter-less node, using the full node span
      * as the open_position so it is never zero-width.
+     *
+     * For BodyDeclaration nodes (FieldDeclaration, MethodDeclaration, etc.)
+     * the JDT source range includes the leading Javadoc comment.  We compute
+     * the start from the first real structural child (modifier or type) so the
+     * open_position only covers the actual code.
      */
     private void createListFromNode(Map<String, Object> nodeMap, ASTNode node) {
-        String spanPosition = getSpanPositionString(node.getStartPosition(), node.getStartPosition() + node.getLength());
-        String endPosition = getPositionString(node.getStartPosition() + node.getLength(), 0);
+        int startPos = node.getStartPosition();
+        int endPos = node.getStartPosition() + node.getLength();
+
+        // For BodyDeclaration nodes the source range may include a leading
+        // Javadoc comment.  Derive the real start from the first modifier or,
+        // failing that, the Type child (for FieldDeclaration/MethodDeclaration).
+        if (node instanceof BodyDeclaration) {
+            BodyDeclaration bodyDecl = (BodyDeclaration) node;
+            @SuppressWarnings("unchecked")
+            List<ASTNode> mods = (List<ASTNode>) bodyDecl.modifiers();
+            if (mods != null && !mods.isEmpty()) {
+                startPos = mods.get(0).getStartPosition();
+            } else if (node instanceof FieldDeclaration) {
+                startPos = ((FieldDeclaration) node).getType().getStartPosition();
+            } else if (node instanceof MethodDeclaration) {
+                MethodDeclaration md = (MethodDeclaration) node;
+                if (md.getReturnType2() != null) {
+                    startPos = md.getReturnType2().getStartPosition();
+                } else {
+                    // Constructor – use the name
+                    startPos = md.getName().getStartPosition();
+                }
+            }
+        }
+
+        String spanPosition = getSpanPositionString(startPos, endPos);
+        String endPosition = getPositionString(endPos, 0);
         createList(nodeMap, "", spanPosition, "", endPosition);
     }
     
