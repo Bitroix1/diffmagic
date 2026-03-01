@@ -575,11 +575,6 @@ def create_diff_nodes(
     with open(output_path, 'w') as f:
         json.dump(output, f, indent=2)
 
-    print(f"\nDiff nodes JSON written to {output_path}")
-    print(f"  Total components after merging: {len(all_components)}")
-    print(f"  Original LHS components: {len(lhs_node_components)}")
-    print(f"  Original RHS components: {len(rhs_node_components)}")
-
 
 def generate_rename_name(
         lhs_node: dict, lhs_parent: dict, lhs_tree: dict,
@@ -609,7 +604,7 @@ def generate_rename_name(
         assert False, parent_class
     return f"{renamed_kind} renamed from {lhs_name} to {rhs_name}"
 
-def generate_addrem_name(node: dict, add: bool) -> str:
+def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
     action = 'added' if add else 'removed'
     node_class = node['nodeClass']
     if node_class == 'VariableDeclarationStatement':
@@ -620,7 +615,7 @@ def generate_addrem_name(node: dict, add: bool) -> str:
         name_loc = node['children'][0]
     elif node_class == 'PrimitiveType' or node_class == node_class == 'SimpleType': #TODO kill me
         added_kind = ''
-        _, parent = find_id(rhs_tree if add else lhs_tree, node['uniqueId'])
+        _, parent = find_id(tree, node['uniqueId'])
         assert parent['nodeClass'] == 'VariableDeclarationStatement' or parent['nodeClass'] == 'FieldDeclaration'
         if parent['nodeClass'] == 'VariableDeclarationStatement':
             name_loc = parent['children'][1]['children'][0]['children'][0]
@@ -649,7 +644,19 @@ def generate_addrem_name(node: dict, add: bool) -> str:
     else:
         assert False, node_class
     assert name_loc['nodeClass'] == 'SimpleName' or name_loc['nodeClass'] == 'QualifiedName' #TODO, fix
-    return f'{added_kind} {name_loc['content']} {action}'
+    base_name = f'{added_kind} {name_loc["content"]} {action}'
+    # Find enclosing method by walking up ancestors
+    current_node = node
+    while current_node:
+        _, ancestor = find_id(tree, current_node['uniqueId'])
+        if ancestor is None:
+            break
+        if ancestor['nodeClass'] == 'MethodDeclaration':
+            method_name = ancestor['children'][0]['content']
+            base_name += f' in {method_name}'
+            break
+        current_node = ancestor
+    return base_name
 
 def create_diff_components(
     lhs_results: tuple,
@@ -776,7 +783,7 @@ def create_diff_components(
                     ancestors = [rhs_parent] + get_all_ancestors(rhs_tree, rhs_parent)
                     if set(a['uniqueId'] for a in ancestors).intersection(added_sinks):
                         continue
-                    component_names.append(generate_addrem_name(rhs_node, True))
+                    component_names.append(generate_addrem_name(rhs_node, True, rhs_tree))
             elif component_kind == 'delete':
                 del_sinks = set(filter(lambda x: x in tos, unmatched_sinks))
                 for del_sink in del_sinks:
@@ -784,7 +791,7 @@ def create_diff_components(
                     ancestors = [lhs_parent] + get_all_ancestors(lhs_tree, lhs_parent)
                     if set(a['uniqueId'] for a in ancestors).intersection(del_sinks):
                         continue
-                    component_names.append(generate_addrem_name(lhs_node, False))
+                    component_names.append(generate_addrem_name(lhs_node, False, lhs_tree))
             else:
                 raise Exception()
 
