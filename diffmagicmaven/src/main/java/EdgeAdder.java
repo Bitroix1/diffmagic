@@ -61,6 +61,28 @@ public class EdgeAdder {
                         String simpleNameDefId = "ImportDeclaration:" + declaringName.getName().toString() + "@" + declaringName.getStartPosition();
                         int simpleNameDefIdNum = declaringName.hashCode();
                         nameResEdges.add(new Main.Edge(usageId, simpleNameDefId, usageIdNum, simpleNameDefIdNum));
+                    } else {
+                        // Fallback: scope-based name resolution when JDT binding fails
+                        // (e.g. inside lambdas with unresolvable enclosing types)
+                        SimpleName declaringName = findDeclarationInScope(node);
+                        if (declaringName != null) {
+                            System.out.println("  Fallback scope resolution found '" + node.getIdentifier() + "' declared at position " + declaringName.getStartPosition());
+                            String usageId = "NameRes:SimpleName:" + node.toString() + "@" + node.getStartPosition();
+                            int usageIdNum = node.hashCode();
+
+                            // Edge to the declaring SimpleName
+                            String simpleNameDefId = "NameRes:SimpleName:" + declaringName.toString() + "@" + declaringName.getStartPosition();
+                            int simpleNameDefIdNum = declaringName.hashCode();
+                            nameResEdges.add(new Main.Edge(usageId, simpleNameDefId, usageIdNum, simpleNameDefIdNum));
+
+                            // Edge to the declaring base node (fragment/parameter)
+                            ASTNode declaringBaseNode = declaringName.getParent();
+                            if (declaringBaseNode != null) {
+                                String baseNodeId = "NameRes::BaseNode:" + declaringBaseNode.getClass().getSimpleName() + "@" + declaringBaseNode.getStartPosition();
+                                int baseNodeIdNum = declaringBaseNode.hashCode();
+                                nameResEdges.add(new Main.Edge(usageId, baseNodeId, usageIdNum, baseNodeIdNum));
+                            }
+                        }
                     }
                 }
                 return super.visit(node);
@@ -256,5 +278,126 @@ public class EdgeAdder {
         });
         
         return result[0];
+    }
+    
+    /**
+     * Fallback scope-based name resolution for when JDT binding resolution fails.
+     * Walks up the AST from the usage node, searching enclosing scopes for a
+     * variable declaration (local variable, parameter, lambda parameter, enhanced-for
+     * variable, etc.) with the same identifier that appears before the usage.
+     * Returns the declaring SimpleName, or null if none found.
+     */
+    private SimpleName findDeclarationInScope(SimpleName usageNode) {
+        String targetName = usageNode.getIdentifier();
+        int usagePosition = usageNode.getStartPosition();
+        
+        ASTNode current = usageNode.getParent();
+        while (current != null) {
+            SimpleName found = searchScopeForDeclaration(current, targetName, usagePosition, usageNode);
+            if (found != null) {
+                return found;
+            }
+            current = current.getParent();
+        }
+        return null;
+    }
+    
+    /**
+     * Search a single scope node for a variable declaration matching targetName
+     * that appears before usagePosition. Only searches direct children  — does not
+     * descend into nested blocks/lambdas/anonymous classes.
+     */
+    private SimpleName searchScopeForDeclaration(ASTNode scope, String targetName, int usagePosition, SimpleName usageNode) {
+        // Check method/lambda parameters
+        if (scope instanceof MethodDeclaration) {
+            for (Object param : ((MethodDeclaration) scope).parameters()) {
+                SingleVariableDeclaration svd = (SingleVariableDeclaration) param;
+                if (svd.getName().getIdentifier().equals(targetName) && svd.getName() != usageNode) {
+                    return svd.getName();
+                }
+            }
+        }
+        
+        if (scope instanceof LambdaExpression) {
+            for (Object param : ((LambdaExpression) scope).parameters()) {
+                if (param instanceof SingleVariableDeclaration) {
+                    SingleVariableDeclaration svd = (SingleVariableDeclaration) param;
+                    if (svd.getName().getIdentifier().equals(targetName) && svd.getName() != usageNode) {
+                        return svd.getName();
+                    }
+                } else if (param instanceof VariableDeclarationFragment) {
+                    VariableDeclarationFragment vdf = (VariableDeclarationFragment) param;
+                    if (vdf.getName().getIdentifier().equals(targetName) && vdf.getName() != usageNode) {
+                        return vdf.getName();
+                    }
+                }
+            }
+        }
+        
+        // Check enhanced-for variable
+        if (scope instanceof EnhancedForStatement) {
+            SingleVariableDeclaration param = ((EnhancedForStatement) scope).getParameter();
+            if (param.getName().getIdentifier().equals(targetName) && param.getName() != usageNode) {
+                return param.getName();
+            }
+        }
+        
+        // Check local variable declarations in blocks (only direct statements, not nested blocks)
+        if (scope instanceof Block) {
+            // Search statements in reverse to find the closest preceding declaration
+            SimpleName best = null;
+            for (Object stmt : ((Block) scope).statements()) {
+                if (stmt instanceof VariableDeclarationStatement) {
+                    VariableDeclarationStatement vds = (VariableDeclarationStatement) stmt;
+                    for (Object frag : vds.fragments()) {
+                        VariableDeclarationFragment vdf = (VariableDeclarationFragment) frag;
+                        if (vdf.getName().getIdentifier().equals(targetName)
+                                && vdf.getName().getStartPosition() < usagePosition
+                                && vdf.getName() != usageNode) {
+                            best = vdf.getName();
+                        }
+                    }
+                }
+            }
+            if (best != null) {
+                return best;
+            }
+        }
+        
+        // Check for-statement initializers
+        if (scope instanceof ForStatement) {
+            for (Object init : ((ForStatement) scope).initializers()) {
+                if (init instanceof VariableDeclarationExpression) {
+                    for (Object frag : ((VariableDeclarationExpression) init).fragments()) {
+                        VariableDeclarationFragment vdf = (VariableDeclarationFragment) frag;
+                        if (vdf.getName().getIdentifier().equals(targetName) && vdf.getName() != usageNode) {
+                            return vdf.getName();
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Check catch clause parameter
+        if (scope instanceof CatchClause) {
+            SingleVariableDeclaration exception = ((CatchClause) scope).getException();
+            if (exception.getName().getIdentifier().equals(targetName) && exception.getName() != usageNode) {
+                return exception.getName();
+            }
+        }
+        
+        // Check field declarations in enclosing type
+        if (scope instanceof TypeDeclaration) {
+            for (FieldDeclaration field : ((TypeDeclaration) scope).getFields()) {
+                for (Object frag : field.fragments()) {
+                    VariableDeclarationFragment vdf = (VariableDeclarationFragment) frag;
+                    if (vdf.getName().getIdentifier().equals(targetName) && vdf.getName() != usageNode) {
+                        return vdf.getName();
+                    }
+                }
+            }
+        }
+        
+        return null;
     }
 }
