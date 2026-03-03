@@ -37,7 +37,7 @@ public class EdgeAdder {
             @Override
             public boolean visit(SimpleName node) {
                 IBinding binding = node.resolveBinding();
-                if (binding != null) {
+                if (binding != null && !binding.getClass().getSimpleName().equals("RecoveredTypeBinding") && findDeclaringNodeForBinding(binding) != null) {
                     System.out.println("Processing SimpleName: '" + node.getIdentifier() + "' at position " + node.getStartPosition());
                     System.out.println("  Binding type: " + binding.getClass().getSimpleName());
                     System.out.println("  Binding key: " + binding.getKey());
@@ -55,12 +55,25 @@ public class EdgeAdder {
                     System.out.println("No binding for SimpleName: '" + node.getIdentifier() + "' at position " + node.getStartPosition());
                     if (importsMap.containsKey(node.getIdentifier())) {
                     	System.out.println("Found " + node.getIdentifier() + " in imports instead");
-                    	ImportDeclaration declaringName = importsMap.get(node.getIdentifier());
+                    	ImportDeclaration declaringImport = importsMap.get(node.getIdentifier());
                     	String usageId = "NameRes:SimpleName:" + node.toString() + "@" + node.getStartPosition();
                         int usageIdNum = node.hashCode();
-                        String simpleNameDefId = "ImportDeclaration:" + declaringName.getName().toString() + "@" + declaringName.getStartPosition();
-                        int simpleNameDefIdNum = declaringName.hashCode();
-                        nameResEdges.add(new Main.Edge(usageId, simpleNameDefId, usageIdNum, simpleNameDefIdNum));
+                        String importDefId = "ImportDeclaration:" + declaringImport.getName().toString() + "@" + declaringImport.getStartPosition();
+                        int importDefIdNum = declaringImport.hashCode();
+                        nameResEdges.add(new Main.Edge(usageId, importDefId, usageIdNum, importDefIdNum));
+                        SimpleName declaringName;
+                        if (declaringImport.getName().isSimpleName()) {
+                        	declaringName = (SimpleName)declaringImport.getName();
+                        }else {
+                        	QualifiedName qName = (QualifiedName)declaringImport.getName();
+                        	declaringName = qName.getName();
+                        }
+                        if (declaringName != node) { //reference equality; is the same node
+	                        int simpleNameDefIdNum = declaringName.hashCode();
+	                        String simpleNameDefId = "NameRes:SimpleName:" + declaringName.toString() + "@" + declaringName.getStartPosition();
+	                        //if (!(simpleNameDefId.equals(usageId) && usageIdNum == simpleNameDefIdNum )) { 
+                        	nameResEdges.add(new Main.Edge(usageId, simpleNameDefId, usageIdNum, simpleNameDefIdNum));
+                        }
                     } else {
                         // Fallback: scope-based name resolution when JDT binding fails
                         // (e.g. inside lambdas with unresolvable enclosing types)
