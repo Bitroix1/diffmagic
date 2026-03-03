@@ -149,6 +149,11 @@ public class Main {
                 ".." + File.separator + ".." + File.separator +
                 "diffmagic" + File.separator + "novel_components.py");
 
+            executeScript("Python (precompute diffs)",
+                "python",
+                ".." + File.separator + ".." + File.separator +
+                "diffmagic" + File.separator + "precompute_diffs.py");
+
         } catch (Exception e) {
             e.printStackTrace();
         } finally {

@@ -645,7 +645,7 @@ def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
         assert False, node_class
     assert name_loc['nodeClass'] == 'SimpleName' or name_loc['nodeClass'] == 'QualifiedName' #TODO, fix
     base_name = f'{added_kind} {name_loc["content"]} {action}'
-    # Find enclosing method by walking up ancestors
+    # Find enclosing method or class by walking up ancestors
     current_node = node
     while current_node:
         _, ancestor = find_id(tree, current_node['uniqueId'])
@@ -654,6 +654,13 @@ def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
         if ancestor['nodeClass'] == 'MethodDeclaration':
             method_name = ancestor['children'][0]['content']
             base_name += f' in {method_name}'
+            break
+        if ancestor['nodeClass'] in ('TypeDeclaration', 'EnumDeclaration', 'AnnotationTypeDeclaration',
+                                     'RecordDeclaration', 'AnonymousClassDeclaration'):
+            # children[0] is the SimpleName for named types; AnonymousClassDeclaration has no name
+            if ancestor['nodeClass'] != 'AnonymousClassDeclaration' and ancestor.get('children'):
+                class_name = ancestor['children'][0]['content']
+                base_name += f' in {class_name}'
             break
         current_node = ancestor
     return base_name
