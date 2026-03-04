@@ -97,6 +97,13 @@ public class EdgeAdder {
                             }
                         }
                     }
+                    // Also run PatternMatchingVisitor when binding is null (e.g. for SimpleTypeToName edges
+                    // where the type cannot be resolved by JDT but the parent/structure edges still apply)
+                    ASTNode parentNode = node.getParent();
+                    if (parentNode != null) {
+                        PatternMatchingVisitor patternVisitor = new PatternMatchingVisitor(node, nameResEdges, EdgeAdder.this);
+                        parentNode.accept(patternVisitor);
+                    }
                 }
                 return super.visit(node);
             }

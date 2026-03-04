@@ -361,8 +361,9 @@ def filter_novel_edges(json_path: str, diff_path: str):
     parent_map = build_parent_mapping(data.get('syntax', {}))
     
     # Filter out internal edges (edges within same novel ancestor)
-    external_edges = filter_internal_edges(filtered_edges, parent_map, novel_unique_ids)
-    
+    # external_edges = filter_internal_edges(filtered_edges, parent_map, novel_unique_ids)
+    external_edges = filtered_edges
+
     # Find connected components as lists of edges
     components = find_connected_components(external_edges)
     
@@ -604,6 +605,17 @@ def generate_rename_name(
         assert False, parent_class
     return f"{renamed_kind} renamed from {lhs_name} to {rhs_name}"
 
+def find_descendant(node: dict, node_class: str) -> dict | None:
+    """Find the first descendant node with the given nodeClass (depth-first)."""
+    if node.get('nodeClass') == node_class:
+        return node
+    for child in node.get('children', []):
+        result = find_descendant(child, node_class)
+        if result is not None:
+            return result
+    return None
+
+
 def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
     action = 'added' if add else 'removed'
     node_class = node['nodeClass']
@@ -620,10 +632,16 @@ def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
         if parent['nodeClass'] == 'VariableDeclarationStatement':
             name_loc = parent['children'][1]['children'][0]['children'][0]
         else:
-            name_loc = parent['children'][0]['children'][0]['children'][0]
+            # FieldDeclaration: find VariableDeclarationFragment (may be nested under Structural)
+            vdf = find_descendant(parent, 'VariableDeclarationFragment')
+            assert vdf is not None, f'No VariableDeclarationFragment found in FieldDeclaration {parent.get("uniqueId")}'
+            name_loc = vdf['children'][0]
     elif node_class == 'FieldDeclaration':
         added_kind = 'field'
-        name_loc = node['children'][0]['children'][0]['children'][0]
+        # Find VariableDeclarationFragment (may be nested under Structural after modifier additions)
+        vdf = find_descendant(node, 'VariableDeclarationFragment')
+        assert vdf is not None, f'No VariableDeclarationFragment found in FieldDeclaration {node.get("uniqueId")}'
+        name_loc = vdf['children'][0]
     elif node_class == 'SingleVariableDeclaration':
         added_kind = 'parameter'
         name_loc = node['children'][0]

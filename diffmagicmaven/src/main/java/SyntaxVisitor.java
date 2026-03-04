@@ -1301,6 +1301,10 @@ public class SyntaxVisitor extends ASTVisitor {
 		createListFromNode(syntaxMap, node);
 		
         ArrayList<Object> children = new ArrayList<>();
+		Object nodeModifiers = getListOf(node.modifiers());
+		if (nodeModifiers != null) {
+			children.add(nodeModifiers);
+		}
 		Object nodeFragments = getListOf(node.fragments());
 		if (nodeFragments != null) {
 			children.add(nodeFragments);

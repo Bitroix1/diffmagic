@@ -147,6 +147,9 @@ public class PatternMatchingVisitor extends ASTVisitor {
         }
         
         if (simpleName == usageNode) {
+            // Always add edge from the SimpleType to its SimpleName child
+            handleSimpleTypeToName(node, simpleName);
+
             // Check if this SimpleType is a type argument in a ParameterizedType
             ASTNode parent = node.getParent();
             if (parent instanceof ParameterizedType) {
@@ -155,6 +158,20 @@ public class PatternMatchingVisitor extends ASTVisitor {
             }
         }
         return true;
+    }
+
+    private void handleSimpleTypeToName(SimpleType simpleType, SimpleName simpleName) {
+        System.out.println("  Pattern: SimpleType to SimpleName edge");
+
+        String simpleTypeId = "SimpleTypeToName:SimpleType:" + simpleType.toString() + "@" + simpleType.getStartPosition();
+        int simpleTypeIdNum = simpleType.hashCode();
+
+        String simpleNameId = "SimpleTypeToName:SimpleName:" + simpleName.getIdentifier() + "@" + simpleName.getStartPosition();
+        int simpleNameIdNum = simpleName.hashCode();
+
+        nameResEdges.add(new Main.Edge(simpleTypeId, simpleNameId, simpleTypeIdNum, simpleNameIdNum));
+
+        System.out.println("  Added SimpleType-to-SimpleName edge: " + simpleType.toString() + "@" + simpleType.getStartPosition() + " -> " + simpleName.getIdentifier() + "@" + simpleName.getStartPosition());
     }
     
     private boolean containsNode(ASTNode parent, ASTNode target) {
