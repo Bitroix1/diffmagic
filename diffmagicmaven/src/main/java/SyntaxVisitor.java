@@ -195,7 +195,7 @@ public class SyntaxVisitor extends ASTVisitor {
      * Unlike getPositionString, this correctly handles spans where the end
      * position is computed independently (important for multi-character or
      * multi-line nodes).
-     * Format: "startLine:startCol-endCol" (same line) or "startLine:startCol-endCol" (end col from endPosition).
+     * Format: "line:startCol-endCol" (same line) or "startLine:startCol-endLine:endCol" (multi-line).
      */
     private String getSpanPositionString(int startPosition, int endPosition) {
         if (startPosition < 0 || endPosition < 0) {
@@ -209,10 +209,8 @@ public class SyntaxVisitor extends ASTVisitor {
         if (startLine == endLine) {
             return startLine + ":" + startCol + "-" + endCol;
         }
-        // Multi-line span: report the start line with columns spanning to end-of-line
-        // and store the end info so the full span is represented.
-        // For now, use start line with endCol from the end position's column.
-        return startLine + ":" + startCol + "-" + endCol;
+        // Multi-line span: "startLine:startCol-endLine:endCol"
+        return startLine + ":" + startCol + "-" + endLine + ":" + endCol;
     }
 
 	// Find the position of a specific character in the source

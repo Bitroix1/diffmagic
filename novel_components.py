@@ -361,8 +361,8 @@ def filter_novel_edges(json_path: str, diff_path: str):
     parent_map = build_parent_mapping(data.get('syntax', {}))
     
     # Filter out internal edges (edges within same novel ancestor)
-    # external_edges = filter_internal_edges(filtered_edges, parent_map, novel_unique_ids)
-    external_edges = filtered_edges
+    external_edges = filter_internal_edges(filtered_edges, parent_map, novel_unique_ids)
+    # external_edges = filtered_edges
 
     # Find connected components as lists of edges
     components = find_connected_components(external_edges)
@@ -625,17 +625,22 @@ def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
     elif node_class == 'MethodDeclaration':
         added_kind = 'method'
         name_loc = node['children'][0]
-    elif node_class == 'PrimitiveType' or node_class == node_class == 'SimpleType': #TODO kill me
+    elif node_class in ('PrimitiveType', 'SimpleType', 'ArrayType', 'ParameterizedType', 'QualifiedType', 'WildcardType', 'UnionType', 'IntersectionType', 'NameQualifiedType'): #TODO kill me
         added_kind = ''
         _, parent = find_id(tree, node['uniqueId'])
-        assert parent['nodeClass'] == 'VariableDeclarationStatement' or parent['nodeClass'] == 'FieldDeclaration'
+        assert parent is not None, f"Type node {node.get('uniqueId')} has no parent"
         if parent['nodeClass'] == 'VariableDeclarationStatement':
             name_loc = parent['children'][1]['children'][0]['children'][0]
-        else:
+        elif parent['nodeClass'] == 'FieldDeclaration':
             # FieldDeclaration: find VariableDeclarationFragment (may be nested under Structural)
             vdf = find_descendant(parent, 'VariableDeclarationFragment')
             assert vdf is not None, f'No VariableDeclarationFragment found in FieldDeclaration {parent.get("uniqueId")}'
             name_loc = vdf['children'][0]
+        elif parent['nodeClass'] == 'SingleVariableDeclaration':
+            name_loc = parent['children'][0]
+        else:
+            # Delegate upward for any other parent (e.g. nested inside another type node)
+            return generate_addrem_name(parent, add, tree)
     elif node_class == 'FieldDeclaration':
         added_kind = 'field'
         # Find VariableDeclarationFragment (may be nested under Structural after modifier additions)
@@ -659,8 +664,16 @@ def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
     elif node_class == 'ImportDeclaration':
         added_kind = 'import'
         name_loc = node['children'][0]
+    elif node_class in ('SimpleName', 'Structural'):
+        # Type-name SimpleName or transparent Structural wrapper — delegate to parent.
+        _, parent = find_id(tree, node['uniqueId'])
+        assert parent is not None, f"SimpleName sink {node.get('uniqueId')} has no parent in tree"
+        return generate_addrem_name(parent, add, tree)
     else:
-        assert False, node_class
+        # Unknown / expression-level node — walk up to the nearest recognizable declaration.
+        _, parent = find_id(tree, node['uniqueId'])
+        assert parent is not None, f"Unhandled node class '{node_class}' (id {node.get('uniqueId')}) has no parent"
+        return generate_addrem_name(parent, add, tree)
     assert name_loc['nodeClass'] == 'SimpleName' or name_loc['nodeClass'] == 'QualifiedName' #TODO, fix
     base_name = f'{added_kind} {name_loc["content"]} {action}'
     # Find enclosing method or class by walking up ancestors
@@ -683,6 +696,23 @@ def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
         current_node = ancestor
     return base_name
 
+def get_top_reachability_node_id(edges: List[dict], parent_map: Dict[int, int],
+                                novel_ids: Set[int], cache: Dict[int, int]) -> int | None:
+    """Build the collapsed directed graph for a set of edges and return the node
+    with the most ancestors (highest reachable_by score)."""
+    collapsed_graph = nx.DiGraph()
+    for edge in edges:
+        from_col = find_largest_novel_ancestor(edge['from']['java_id'], parent_map, novel_ids, cache)
+        to_col = find_largest_novel_ancestor(edge['to']['java_id'], parent_map, novel_ids, cache)
+        if from_col != to_col:
+            collapsed_graph.add_edge(from_col, to_col)
+        else:
+            collapsed_graph.add_node(from_col)
+    if not collapsed_graph.nodes():
+        return None
+    return max(collapsed_graph.nodes(), key=lambda n: len(nx.ancestors(collapsed_graph, n)))
+
+
 def create_diff_components(
     lhs_results: tuple,
     rhs_results: tuple,
@@ -701,8 +731,8 @@ def create_diff_components(
         unify_comps: List of (rhs_id, lhs_id) tuples indicating nodes that should be in same component
         output_path: Path for the output JSON file
     """
-    lhs_components, lhs_unique_id_to_info, _, _ = lhs_results
-    rhs_components, rhs_unique_id_to_info, _, _ = rhs_results
+    lhs_components, lhs_unique_id_to_info, lhs_parent_map, lhs_novel_ids = lhs_results
+    rhs_components, rhs_unique_id_to_info, rhs_parent_map, rhs_novel_ids = rhs_results
     
     # Convert LHS and RHS components to JSON
     lhs_components_json = components_to_json_structure(lhs_components, lhs_unique_id_to_info)
@@ -792,36 +822,31 @@ def create_diff_components(
 
         if component_changes:
             component_kind = get_kind()
-            component_names = []
             tos = {c['to']['java_id'] for c in component_changes}
+            reachability_cache = {}
             if component_kind == 'rename':
-                # find the matched sink(s)
                 sinks_matched = list(filter(lambda sinks: sinks[0] in tos or sinks[1] in tos, unify_comps))
-                for (rhs_sink, lhs_sink) in sinks_matched:
-                    rhs_node, rhs_parent = find_id(rhs_tree,rhs_sink)
-                    lhs_node, lhs_parent = find_id(lhs_tree,lhs_sink)
-                    component_names.append(generate_rename_name(lhs_node, lhs_parent, lhs_tree, rhs_node, rhs_parent, rhs_tree))
+                if sinks_matched:
+                    rhs_sink, lhs_sink = sinks_matched[0]
+                    rhs_node, rhs_parent = find_id(rhs_tree, rhs_sink)
+                    lhs_node, lhs_parent = find_id(lhs_tree, lhs_sink)
+                    name = generate_rename_name(lhs_node, lhs_parent, lhs_tree, rhs_node, rhs_parent, rhs_tree)
+                else:
+                    name = ''
             elif component_kind == 'add':
-                added_sinks = set(filter(lambda x: x in tos, unmatched_sinks))
-                for added_sink in added_sinks:
-                    rhs_node, rhs_parent = find_id(rhs_tree, added_sink)
-                    ancestors = [rhs_parent] + get_all_ancestors(rhs_tree, rhs_parent)
-                    if set(a['uniqueId'] for a in ancestors).intersection(added_sinks):
-                        continue
-                    component_names.append(generate_addrem_name(rhs_node, True, rhs_tree))
+                rhs_edges = [c for c in component_changes if c['kind'] == 'Addition']
+                top_id = get_top_reachability_node_id(rhs_edges, rhs_parent_map, rhs_novel_ids, reachability_cache)
+                rhs_node, _ = find_id(rhs_tree, top_id) if top_id is not None else (None, None)
+                name = generate_addrem_name(rhs_node, True, rhs_tree) if rhs_node else ''
             elif component_kind == 'delete':
-                del_sinks = set(filter(lambda x: x in tos, unmatched_sinks))
-                for del_sink in del_sinks:
-                    lhs_node, lhs_parent = find_id(lhs_tree, del_sink)
-                    ancestors = [lhs_parent] + get_all_ancestors(lhs_tree, lhs_parent)
-                    if set(a['uniqueId'] for a in ancestors).intersection(del_sinks):
-                        continue
-                    component_names.append(generate_addrem_name(lhs_node, False, lhs_tree))
+                lhs_edges = [c for c in component_changes if c['kind'] == 'Removal']
+                top_id = get_top_reachability_node_id(lhs_edges, lhs_parent_map, lhs_novel_ids, reachability_cache)
+                lhs_node, _ = find_id(lhs_tree, top_id) if top_id is not None else (None, None)
+                name = generate_addrem_name(lhs_node, False, lhs_tree) if lhs_node else ''
             else:
                 raise Exception()
 
-            final_component_name = ', '.join(component_names)
-            final_component_name = final_component_name[0].upper() + final_component_name[1:] if final_component_name else ''
+            final_component_name = name[0].upper() + name[1:] if name else ''
             final_components.append({
                 'component_id': component_id,
                 'component_name': final_component_name,

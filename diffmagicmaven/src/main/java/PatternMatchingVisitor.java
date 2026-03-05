@@ -76,10 +76,34 @@ public class PatternMatchingVisitor extends ASTVisitor {
     }
     
     @Override
+    public boolean visit(SingleVariableDeclaration node) {
+        if (node.getName() == usageNode) {
+            Type declType = node.getType();
+            if (declType != null) {
+                handleDeclarationToTypeEdge(node, declType);
+            }
+        }
+        return true;
+    }
+
+    @Override
     public boolean visit(VariableDeclarationFragment fragment) {
         // Add edge from fragment to its parent declaration statement
         if (fragment.getName() == usageNode) {
             handleFragmentToDeclarationEdge(fragment);
+            // Add edge from parent declaration to its type
+            ASTNode declParent = fragment.getParent();
+            Type declType = null;
+            if (declParent instanceof VariableDeclarationStatement) {
+                declType = ((VariableDeclarationStatement) declParent).getType();
+            } else if (declParent instanceof VariableDeclarationExpression) {
+                declType = ((VariableDeclarationExpression) declParent).getType();
+            } else if (declParent instanceof FieldDeclaration) {
+                declType = ((FieldDeclaration) declParent).getType();
+            }
+            if (declType != null) {
+                handleDeclarationToTypeEdge(declParent, declType);
+            }
         }
 
         // Check if this is a variable declaration with initialization
@@ -550,6 +574,39 @@ public class PatternMatchingVisitor extends ASTVisitor {
                 nameResEdges.add(new Main.Edge(initTypeId, varTypeId, initTypeIdNum, varTypeIdNum));
                 
                 System.out.println("  Added initialization variable-type edge: " + initType.toString() + " -> " + varType.toString());
+            }
+        }
+    }
+
+    private void handleDeclarationToTypeEdge(ASTNode declaration, Type type) {
+        System.out.println("  Pattern: Type to Declaration edge");
+
+        String declId = "TypeToDecl:Declaration:" + declaration.getClass().getSimpleName() + "@" + declaration.getStartPosition();
+        int declIdNum = declaration.hashCode();
+
+        String typeId = "TypeToDecl:Type:" + type.toString() + "@" + type.getStartPosition();
+        int typeIdNum = type.hashCode();
+
+        nameResEdges.add(new Main.Edge(typeId, declId, typeIdNum, declIdNum));
+
+        System.out.println("  Added type-to-declaration edge: " + type.toString() + "@" + type.getStartPosition() + " -> " + declaration.getClass().getSimpleName() + "@" + declaration.getStartPosition());
+
+        // Also add DeclToTypeName edge: declaration -> SimpleName inside the SimpleType
+        if (type instanceof SimpleType) {
+            Name typeName = ((SimpleType) type).getName();
+            SimpleName simpleName = null;
+            if (typeName instanceof SimpleName) {
+                simpleName = (SimpleName) typeName;
+            } else if (typeName instanceof QualifiedName) {
+                simpleName = ((QualifiedName) typeName).getName();
+            }
+            if (simpleName != null) {
+                String simpleNameId = "DeclToTypeName:SimpleName:" + simpleName.getIdentifier() + "@" + simpleName.getStartPosition();
+                int simpleNameIdNum = simpleName.hashCode();
+
+                nameResEdges.add(new Main.Edge(declId, simpleNameId, declIdNum, simpleNameIdNum));
+
+                System.out.println("  Added declaration-to-type-name edge: " + declaration.getClass().getSimpleName() + "@" + declaration.getStartPosition() + " -> " + simpleName.getIdentifier() + "@" + simpleName.getStartPosition());
             }
         }
     }
