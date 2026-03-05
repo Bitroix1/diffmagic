@@ -589,21 +589,30 @@ def generate_rename_name(
     elif parent_class == 'VariableDeclarationFragment':
         renamed_kind = 'variable'
     elif parent_class == 'SingleVariableDeclaration':
-        _, lhs_grandparent = find_id(lhs_tree, lhs_parent['uniqueId'])
-        assert lhs_grandparent['nodeClass'] == 'Structural'
-        _, lhs_greatgrandparent = find_id(lhs_tree, lhs_grandparent['uniqueId'])
-        grandparent_class = lhs_greatgrandparent['nodeClass']
-        if grandparent_class == 'MethodDeclaration':
-            assert lhs_greatgrandparent['children'][0]['nodeClass'] == 'SimpleName'
-            method_name = lhs_greatgrandparent['children'][0]['content']
-            renamed_kind = f'parameter of method {method_name}'
-        else:
-            assert False, grandparent_class
+        renamed_kind = 'parameter'
     elif parent_class == 'MethodDeclaration':
         renamed_kind = 'method'
     else:
         assert False, parent_class
-    return f"{renamed_kind} renamed from {lhs_name} to {rhs_name}"
+    base_name = f"{renamed_kind} renamed from {lhs_name} to {rhs_name}"
+    # Walk up ancestors to find enclosing method or class
+    current_node = lhs_parent
+    while current_node:
+        _, ancestor = find_id(lhs_tree, current_node['uniqueId'])
+        if ancestor is None:
+            break
+        if ancestor['nodeClass'] == 'MethodDeclaration':
+            method_name = ancestor['children'][0]['content']
+            base_name += f' in {method_name}'
+            break
+        if ancestor['nodeClass'] in ('TypeDeclaration', 'EnumDeclaration', 'AnnotationTypeDeclaration',
+                                     'RecordDeclaration', 'AnonymousClassDeclaration'):
+            if ancestor['nodeClass'] != 'AnonymousClassDeclaration' and ancestor.get('children'):
+                class_name = ancestor['children'][0]['content']
+                base_name += f' in {class_name}'
+            break
+        current_node = ancestor
+    return base_name
 
 def find_descendant(node: dict, node_class: str) -> dict | None:
     """Find the first descendant node with the given nodeClass (depth-first)."""
