@@ -7,10 +7,30 @@ import java.util.Map;
 public class EdgeAdder {
     private List<Main.Edge> nameResEdges;
     private List<CompilationUnit> compilationUnits;
+    private Map<String, List<ImportDeclaration>> allImportsMap;
     
     public EdgeAdder(List<CompilationUnit> compilationUnits) {
         this.compilationUnits = compilationUnits;
         this.nameResEdges = new ArrayList<>();
+        this.allImportsMap = buildGlobalImportsMap();
+    }
+    
+    private Map<String, List<ImportDeclaration>> buildGlobalImportsMap() {
+        Map<String, List<ImportDeclaration>> map = new HashMap<>();
+        for (CompilationUnit cu : compilationUnits) {
+            for (Object imp : cu.imports()) {
+                ImportDeclaration importDecl = (ImportDeclaration) imp;
+                if (importDecl.isOnDemand()) continue;
+                SimpleName simpleName;
+                if (importDecl.getName().isQualifiedName()) {
+                    simpleName = ((QualifiedName) importDecl.getName()).getName();
+                } else {
+                    simpleName = (SimpleName) importDecl.getName();
+                }
+                map.computeIfAbsent(simpleName.getIdentifier(), k -> new ArrayList<>()).add(importDecl);
+            }
+        }
+        return map;
     }
     
     public List<Main.Edge> getNameResEdges() {
@@ -18,22 +38,7 @@ public class EdgeAdder {
     }
     
     public void addEdgesForCompilationUnit(CompilationUnit compilationUnit) {
-    	final Map<String, ImportDeclaration> importsMap = new HashMap<>();
         compilationUnit.accept(new ASTVisitor() {
-        	@Override
-        	public boolean visit(ImportDeclaration node) {
-        		if (node.isOnDemand()) return false;
-        		SimpleName simpleName = null;
-        		if (node.getName().isQualifiedName()) {
-        			simpleName = ((QualifiedName)node.getName()).getName();
-        		}
-        		else {
-        			simpleName = (SimpleName)node.getName();
-        		}
-        		importsMap.put(simpleName.getIdentifier(), node);
-        		return true;
-        	}
-        	
             @Override
             public boolean visit(SimpleName node) {
                 IBinding binding = node.resolveBinding();
@@ -53,26 +58,27 @@ public class EdgeAdder {
                     }
                 } else {
                     System.out.println("No binding for SimpleName: '" + node.getIdentifier() + "' at position " + node.getStartPosition());
-                    if (importsMap.containsKey(node.getIdentifier())) {
-                    	System.out.println("Found " + node.getIdentifier() + " in imports instead");
-                    	ImportDeclaration declaringImport = importsMap.get(node.getIdentifier());
+                    List<ImportDeclaration> matchingImports = allImportsMap.get(node.getIdentifier());
+                    if (matchingImports != null && !matchingImports.isEmpty()) {
+                    	System.out.println("Found " + node.getIdentifier() + " in imports across " + matchingImports.size() + " file(s)");
                     	String usageId = "NameRes:SimpleName:" + node.toString() + "@" + node.getStartPosition();
                         int usageIdNum = node.hashCode();
-                        String importDefId = "ImportDeclaration:" + declaringImport.getName().toString() + "@" + declaringImport.getStartPosition();
-                        int importDefIdNum = declaringImport.hashCode();
-                        nameResEdges.add(new Main.Edge(usageId, importDefId, usageIdNum, importDefIdNum));
-                        SimpleName declaringName;
-                        if (declaringImport.getName().isSimpleName()) {
-                        	declaringName = (SimpleName)declaringImport.getName();
-                        }else {
-                        	QualifiedName qName = (QualifiedName)declaringImport.getName();
-                        	declaringName = qName.getName();
-                        }
-                        if (declaringName != node) { //reference equality; is the same node
-	                        int simpleNameDefIdNum = declaringName.hashCode();
-	                        String simpleNameDefId = "NameRes:SimpleName:" + declaringName.toString() + "@" + declaringName.getStartPosition();
-	                        //if (!(simpleNameDefId.equals(usageId) && usageIdNum == simpleNameDefIdNum )) { 
-                        	nameResEdges.add(new Main.Edge(usageId, simpleNameDefId, usageIdNum, simpleNameDefIdNum));
+                        for (ImportDeclaration declaringImport : matchingImports) {
+                            String importDefId = "ImportDeclaration:" + declaringImport.getName().toString() + "@" + declaringImport.getStartPosition();
+                            int importDefIdNum = declaringImport.hashCode();
+                            nameResEdges.add(new Main.Edge(usageId, importDefId, usageIdNum, importDefIdNum));
+                            SimpleName declaringName;
+                            if (declaringImport.getName().isSimpleName()) {
+                            	declaringName = (SimpleName)declaringImport.getName();
+                            } else {
+                            	QualifiedName qName = (QualifiedName)declaringImport.getName();
+                            	declaringName = qName.getName();
+                            }
+                            if (declaringName != node) {
+	                            int simpleNameDefIdNum = declaringName.hashCode();
+	                            String simpleNameDefId = "NameRes:SimpleName:" + declaringName.toString() + "@" + declaringName.getStartPosition();
+                            	nameResEdges.add(new Main.Edge(usageId, simpleNameDefId, usageIdNum, simpleNameDefIdNum));
+                            }
                         }
                     } else {
                         // Fallback: scope-based name resolution when JDT binding fails

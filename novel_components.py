@@ -443,11 +443,25 @@ def compute_node_reachability(components: List[List[dict]],
     cache = {}
 
     for component_edges in components:
-        # Collapse each edge endpoint to its largest novel ancestor
-        collapsed_graph = nx.DiGraph()
+        # Collect all raw edge endpoint IDs
+        edge_endpoint_ids = set()
         for edge in component_edges:
-            from_collapsed = find_largest_novel_ancestor(edge['fromUniqueId'], parent_map, novel_unique_ids, cache)
-            to_collapsed = find_largest_novel_ancestor(edge['toUniqueId'], parent_map, novel_unique_ids, cache)
+            edge_endpoint_ids.add(edge['fromUniqueId'])
+            edge_endpoint_ids.add(edge['toUniqueId'])
+
+        # Collapse each edge endpoint to its largest novel ancestor.
+        # Track which original endpoints map to each collapsed node.
+        collapsed_graph = nx.DiGraph()
+        collapsed_to_originals: Dict[int, Set[int]] = {}
+        for edge in component_edges:
+            from_raw = edge['fromUniqueId']
+            to_raw = edge['toUniqueId']
+            from_collapsed = find_largest_novel_ancestor(from_raw, parent_map, novel_unique_ids, cache)
+            to_collapsed = find_largest_novel_ancestor(to_raw, parent_map, novel_unique_ids, cache)
+
+            collapsed_to_originals.setdefault(from_collapsed, set()).add(from_raw)
+            collapsed_to_originals.setdefault(to_collapsed, set()).add(to_raw)
+
             if from_collapsed != to_collapsed:  # skip self-loops
                 collapsed_graph.add_edge(from_collapsed, to_collapsed)
             else:
@@ -459,15 +473,27 @@ def compute_node_reachability(components: List[List[dict]],
             # Count how many other collapsed nodes can reach this node
             ancestors = nx.ancestors(collapsed_graph, node_id)
 
-            info = unique_id_to_info.get(node_id, {})
-            nodes_list.append({
-                'java_id': node_id,
-                'type': f"{info.get('nodeClass', 'Unknown')} ({info.get('node_kind', 'unknown')})",
-                'content': info.get('content', 'N/A'),
-                'position': info.get('position', 'N/A'),
-                'file': info.get('file', 'Unknown'),
-                'reachable_by': len(ancestors)
-            })
+            # If the collapsed node is itself an edge endpoint, use it directly.
+            # Otherwise, fall back to the original edge endpoints that collapsed
+            # into it — this avoids spurious highlights from large ancestor nodes
+            # (e.g. a MethodInvocation whose text span is just a paren) while
+            # still representing every changed line.
+            if node_id in edge_endpoint_ids:
+                emit_ids = [node_id]
+            else:
+                emit_ids = [oid for oid in collapsed_to_originals.get(node_id, set())
+                            if oid in edge_endpoint_ids]
+
+            for emit_id in emit_ids:
+                info = unique_id_to_info.get(emit_id, {})
+                nodes_list.append({
+                    'java_id': emit_id,
+                    'type': f"{info.get('nodeClass', 'Unknown')} ({info.get('node_kind', 'unknown')})",
+                    'content': info.get('content', 'N/A'),
+                    'position': info.get('position', 'N/A'),
+                    'file': info.get('file', 'Unknown'),
+                    'reachable_by': len(ancestors)
+                })
 
         # Sort nodes: most reachable first, then by java_id for stability
         nodes_list.sort(key=lambda n: (-n['reachable_by'], n['java_id']))
