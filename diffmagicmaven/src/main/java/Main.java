@@ -120,14 +120,12 @@ public class Main {
             lhsOutput.put("syntax", lhsSyntaxes);
             rhsOutput.put("syntax", rhsSyntaxes);
 
-            // Convert to JSON with pretty printing
+            // Stream JSON directly to files to avoid huge in-memory strings
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            String lhsJsonStr = gson.toJson(lhsOutput);
-            String rhsJsonStr = gson.toJson(rhsOutput);
 
             // Save LHS JSON to file
             try (FileWriter file = new FileWriter(BASE_DIR + "lhs.json")) {
-                file.write(lhsJsonStr);
+                gson.toJson(lhsOutput, file);
                 System.out.println("\nLHS JSON saved to: " + BASE_DIR + "lhs.json");
             } catch (IOException e) {
                 System.err.println("\nError saving LHS JSON to file: " + e.getMessage());
@@ -135,7 +133,7 @@ public class Main {
 
             // Save RHS JSON to file
             try (FileWriter file = new FileWriter(BASE_DIR + "rhs.json")) {
-                file.write(rhsJsonStr);
+                gson.toJson(rhsOutput, file);
                 System.out.println("\nRHS JSON saved to: " + BASE_DIR + "rhs.json");
             } catch (IOException e) {
                 System.err.println("\nError saving RHS JSON to file: " + e.getMessage());
