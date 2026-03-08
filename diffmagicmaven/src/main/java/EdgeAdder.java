@@ -55,6 +55,52 @@ public class EdgeAdder {
                     // Add standard name resolution edges
                     addNameResolutionEdge(compilationUnit, node, binding);
                     
+                    // Also link the local import declaration (if any) to the
+                    // resolved declaration, so the path goes:
+                    //   usage -> import line -> actual declaration
+                    // This connects usages across files that share the same import.
+                    if (localImports.containsKey(node.getIdentifier())) {
+                        ImportDeclaration declaringImport = localImports.get(node.getIdentifier());
+                        SimpleName importSimpleName;
+                        if (declaringImport.getName().isSimpleName()) {
+                            importSimpleName = (SimpleName) declaringImport.getName();
+                        } else {
+                            QualifiedName qName = (QualifiedName) declaringImport.getName();
+                            importSimpleName = qName.getName();
+                        }
+
+                        // Edge: usage -> import SimpleName
+                        String usageId = "NameRes:SimpleName:" + node.toString() + "@" + node.getStartPosition();
+                        int usageIdNum = node.hashCode();
+                        if (importSimpleName != node) {
+                            String importSnId = "NameRes:SimpleName:" + importSimpleName.toString() + "@" + importSimpleName.getStartPosition();
+                            int importSnIdNum = importSimpleName.hashCode();
+                            nameResEdges.add(new Main.Edge(usageId, importSnId, usageIdNum, importSnIdNum));
+                        }
+
+                        // Edge: usage -> ImportDeclaration (the import row itself)
+                        String importId = "ImportDeclaration:" + declaringImport.getName().toString() + "@" + declaringImport.getStartPosition();
+                        int importIdNum = declaringImport.hashCode();
+                        nameResEdges.add(new Main.Edge(usageId, importId, usageIdNum, importIdNum));
+
+                        ASTNode declaringNode = compilationUnit.findDeclaringNode(binding);
+                        if (declaringNode == null) {
+                            declaringNode = findDeclaringNodeForBinding(binding);
+                        }
+                        if (declaringNode != null) {
+                            String baseNodeId = "NameRes::BaseNode:" + declaringNode.getClass().getSimpleName() + "@" + declaringNode.getStartPosition();
+                            int baseNodeIdNum = declaringNode.hashCode();
+                            nameResEdges.add(new Main.Edge(importId, baseNodeId, importIdNum, baseNodeIdNum));
+
+                            SimpleName declName = findDeclaringSimpleName(declaringNode, binding);
+                            if (declName != null) {
+                                String declNameId = "NameRes:SimpleName:" + declName.toString() + "@" + declName.getStartPosition();
+                                int declNameIdNum = declName.hashCode();
+                                nameResEdges.add(new Main.Edge(importId, declNameId, importIdNum, declNameIdNum));
+                            }
+                        }
+                    }
+                    
                     // Use pattern matching visitor on the parent context where this SimpleName is used
                     ASTNode parent = node.getParent();
                     if (parent != null) {
@@ -81,23 +127,26 @@ public class EdgeAdder {
                         String recoveredNodeId = "RecoveredNode:" + s.getIdentifier() + "@" + s.getStartPosition();
                         int recoveredNodeIdNum = s.hashCode();
                         nameResEdges.add(new Main.Edge(usageId, recoveredNodeId, usageIdNum, recoveredNodeIdNum));
-//                        for (ImportDeclaration declaringImport : matchingImports) {
-//                            String importDefId = "ImportDeclaration:" + declaringImport.getName().toString() + "@" + declaringImport.getStartPosition();
-//                            int importDefIdNum = declaringImport.hashCode();
-//                            nameResEdges.add(new Main.Edge(usageId, importDefId, usageIdNum, importDefIdNum));
-//                            SimpleName declaringName;
-//                            if (declaringImport.getName().isSimpleName()) {
-//                            	declaringName = (SimpleName)declaringImport.getName();
-//                            } else {
-//                            	QualifiedName qName = (QualifiedName)declaringImport.getName();
-//                            	declaringName = qName.getName();
-//                            }
-//                            if (declaringName != node) {
-//	                            int simpleNameDefIdNum = declaringName.hashCode();
-//	                            String simpleNameDefId = "NameRes:SimpleName:" + declaringName.toString() + "@" + declaringName.getStartPosition();
-//                            	nameResEdges.add(new Main.Edge(usageId, simpleNameDefId, usageIdNum, simpleNameDefIdNum));
-//                            }
-//                        }
+                        // Also link to the local import if one matches, so that usages with
+                        // different recovered binding keys still connect to their import.
+                        if (localImports.containsKey(node.getIdentifier())) {
+                            ImportDeclaration declaringImport = localImports.get(node.getIdentifier());
+                            String importDefId = "ImportDeclaration:" + declaringImport.getName().toString() + "@" + declaringImport.getStartPosition();
+                            int importDefIdNum = declaringImport.hashCode();
+                            nameResEdges.add(new Main.Edge(usageId, importDefId, usageIdNum, importDefIdNum));
+                            SimpleName declaringName;
+                            if (declaringImport.getName().isSimpleName()) {
+                                declaringName = (SimpleName)declaringImport.getName();
+                            } else {
+                                QualifiedName qName = (QualifiedName)declaringImport.getName();
+                                declaringName = qName.getName();
+                            }
+                            if (declaringName != node) {
+                                int simpleNameDefIdNum = declaringName.hashCode();
+                                String simpleNameDefId = "NameRes:SimpleName:" + declaringName.toString() + "@" + declaringName.getStartPosition();
+                                nameResEdges.add(new Main.Edge(usageId, simpleNameDefId, usageIdNum, simpleNameDefIdNum));
+                            }
+                        }
                     } else if (localImports.containsKey(node.getIdentifier())) {
                     	//make an edge to the import
                     	System.out.println("Found " + node.getIdentifier() + " in a local import");

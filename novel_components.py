@@ -733,7 +733,10 @@ def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
     else:
         # Unknown / expression-level node — walk up to the nearest recognizable declaration.
         _, parent = find_id(tree, node['uniqueId'])
-        assert parent is not None, f"Unhandled node class '{node_class}' (id {node.get('uniqueId')}) has no parent"
+        if parent is None:
+            # Reached the tree root (e.g. CompilationUnit) without a recognizable declaration
+            content = node.get('content', node_class)
+            return f'{content} {action}'
         return generate_addrem_name(parent, add, tree)
     assert name_loc['nodeClass'] == 'SimpleName' or name_loc['nodeClass'] == 'QualifiedName' #TODO, fix
     base_name = f'{added_kind} {name_loc["content"]} {action}'
@@ -908,6 +911,20 @@ def create_diff_components(
                 raise Exception()
 
             final_component_name = name[0].upper() + name[1:] if name else ''
+
+            # If all edges belong to a single file, append "in file X" to disambiguate
+            all_files = set()
+            for c in component_changes:
+                all_files.add(c['from']['file'])
+                all_files.add(c['to']['file'])
+            all_files.discard('Unknown')
+            if len(all_files) == 1 and final_component_name:
+                filename = next(iter(all_files))
+                # Strip .java extension if present
+                if filename.endswith('.java'):
+                    filename = filename[:-5]
+                final_component_name += f' in {filename}'
+
             final_components.append({
                 'component_id': component_id,
                 'component_name': final_component_name,
