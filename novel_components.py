@@ -331,6 +331,22 @@ def filter_novel_edges(json_path: str, diff_path: str):
     
     edges = data.get('nameResEdges', [])
     
+    # Detect fake node IDs: IDs that appear in edges but not in the syntax tree.
+    # These are synthetic bridge nodes created by EdgeAdder to link unresolved
+    # references (e.g. shared imports) across files.
+    all_edge_ids = set()
+    for edge in edges:
+        fid = edge.get('fromId')
+        tid = edge.get('toId')
+        if fid is not None:
+            all_edge_ids.add(fid)
+        if tid is not None:
+            all_edge_ids.add(tid)
+    fake_node_ids = all_edge_ids - set(unique_id_to_info.keys())
+    
+    # Treat fake nodes as novel so bridge edges pass the filter
+    novel_with_fakes = novel_unique_ids | fake_node_ids
+    
     # Filter edges - working directly with uniqueIds
     filtered_edges = []
     seen_edges = set()  # For duplicate detection
@@ -343,8 +359,8 @@ def filter_novel_edges(json_path: str, diff_path: str):
         if from_unique_id is None or to_unique_id is None:
             continue
         
-        # Check if both sides are novel (using Java uniqueIds)
-        if from_unique_id in novel_unique_ids and to_unique_id in novel_unique_ids:
+        # Check if both sides are novel (or fake bridge nodes)
+        if from_unique_id in novel_with_fakes and to_unique_id in novel_with_fakes:
             # Create edge tuple for duplicate detection
             edge_tuple = (from_unique_id, to_unique_id, edge.get('from', ''), edge.get('to', ''))
             
@@ -364,10 +380,20 @@ def filter_novel_edges(json_path: str, diff_path: str):
     external_edges = filter_internal_edges(filtered_edges, parent_map, novel_unique_ids)
     # external_edges = filtered_edges
 
-    # Find connected components as lists of edges
+    # Find connected components as lists of edges (fake node edges provide cross-file bridging)
     components = find_connected_components(external_edges)
     
-    return components, unique_id_to_info, parent_map, novel_unique_ids
+    # Remove edges involving fake nodes from components: they served only as
+    # bridge for connectivity and shouldn't appear in the UI.
+    cleaned_components = []
+    for component in components:
+        cleaned = [e for e in component
+                   if e['fromUniqueId'] not in fake_node_ids
+                   and e['toUniqueId'] not in fake_node_ids]
+        if cleaned:
+            cleaned_components.append(cleaned)
+    
+    return cleaned_components, unique_id_to_info, parent_map, novel_unique_ids
 
 
 def components_to_json_structure(components: List[List[dict]], 
