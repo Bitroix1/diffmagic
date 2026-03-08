@@ -2995,6 +2995,10 @@ public class SyntaxVisitor extends ASTVisitor {
 		if (nodeSuper != null) {
 			children.add(nodeSuper);
 		}
+		Object nodeInterfaces = getListOf(node.superInterfaceTypes());
+		if (nodeInterfaces != null) {
+			children.add(nodeInterfaces);
+		}
 
         syntaxMap.put("children", children);
 		
