@@ -2309,14 +2309,28 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(QualifiedName node) {
 		syntaxMap = new HashMap<>();
-		String content = node.getFullyQualifiedName();
+//		String content = node.getFullyQualifiedName();
+		
+		Name qualifier = node.getQualifier();
+		SimpleName name = node.getName();
+		
+		ArrayList<Object> children = new ArrayList<>();
+		if (qualifier != null)
+			children.add(getNodeSyntax(qualifier));
+		if (name != null)
+			children.add(getNodeSyntax(name));
 
-		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
-		syntaxMap.put("kind", "Normal");
+		syntaxMap.put("children", children);
 		
 		syntaxMap.put("uniqueId", node.hashCode());
 		
 		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
+//		createAtom(syntaxMap, content, getPositionString(node.getStartPosition(), content.length()));
+//		syntaxMap.put("kind", "Normal");
+//		
+//		syntaxMap.put("uniqueId", node.hashCode());
+//		
+//		syntaxMap.put("nodeClass", node.getClass().getSimpleName());
 		
 		return false;
 	}

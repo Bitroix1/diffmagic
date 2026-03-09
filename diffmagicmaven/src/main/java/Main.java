@@ -64,13 +64,15 @@ public class Main {
             // Process LHS files
             List<String> lhsJavaFiles = getAllJavaFiles(new File(lhsSourceDir));
             java.util.Collections.sort(lhsJavaFiles);  // Sort for consistent ordering
-            List<FileDetails> lhsFilesDetails = processFiles(lhsJavaFiles, 1);
+            FilesResult lhsResult = processFiles(lhsJavaFiles, 1);
+            List<FileDetails> lhsFilesDetails = lhsResult.filesDetails;
 
             // Process RHS files (need both before assigning IDs)
             int lastLhsUniqueId = SyntaxVisitor.getLastUniqueId();
             List<String> rhsJavaFiles = getAllJavaFiles(new File(rhsSourceDir));
             java.util.Collections.sort(rhsJavaFiles);  // Sort for consistent ordering
-            List<FileDetails> rhsFilesDetails = processFiles(rhsJavaFiles, lastLhsUniqueId + 1);
+            FilesResult rhsResult = processFiles(rhsJavaFiles, lastLhsUniqueId + 1);
+            List<FileDetails> rhsFilesDetails = rhsResult.filesDetails;
 
             // Prepare output structures
             List<Edge> lhsNameResEdges = new ArrayList<>();
@@ -119,6 +121,8 @@ public class Main {
             rhsOutput.put("nameResEdges", rhsNameResEdges);
             lhsOutput.put("syntax", lhsSyntaxes);
             rhsOutput.put("syntax", rhsSyntaxes);
+            lhsOutput.put("fakeEdges", lhsResult.fakeNodeIds);
+            rhsOutput.put("fakeEdges", rhsResult.fakeNodeIds);
 
             // Stream JSON directly to files to avoid huge in-memory strings
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -280,8 +284,13 @@ public class Main {
         return javaFiles;
     }
     
+    private static class FilesResult {
+    	List<FileDetails> filesDetails;
+    	List<String> fakeNodeIds;
+    }
+    
     // Helper method to process files with batch parsing approach
-    private static List<FileDetails> processFiles(
+    private static FilesResult processFiles(
             List<String> javaFiles,
             int startUniqueId) throws Exception {
         List<FileDetails> filesDetails = new ArrayList<>();
@@ -378,8 +387,12 @@ public class Main {
             filesDetails.add(new FileDetails(filePath, edgeAdder.getNameResEdges(), syntax));
             System.out.println("Processed: " + new File(filePath).getName() + " (" + edgeAdder.getNameResEdges().size() + " edges)");
         }
+        
+        FilesResult res = new FilesResult();
+        res.filesDetails = filesDetails;
+        res.fakeNodeIds = edgeAdder.getFakeNodeUids();
 
-        return filesDetails;
+        return res;
     }
     
     private static void assignDFSIds(Map<String, Object> node, int[] idCounter) {
