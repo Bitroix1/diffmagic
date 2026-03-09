@@ -331,18 +331,22 @@ def filter_novel_edges(json_path: str, diff_path: str):
     
     edges = data.get('nameResEdges', [])
     
-    # Detect fake node IDs: IDs that appear in edges but not in the syntax tree.
-    # These are synthetic bridge nodes created by EdgeAdder to link unresolved
-    # references (e.g. shared imports) across files.
-    all_edge_ids = set()
-    for edge in edges:
-        fid = edge.get('fromId')
-        tid = edge.get('toId')
-        if fid is not None:
-            all_edge_ids.add(fid)
-        if tid is not None:
-            all_edge_ids.add(tid)
-    fake_node_ids = all_edge_ids - set(unique_id_to_info.keys())
+    # Detect fake node IDs: use the explicit fakeNodes list from the JSON if
+    # available, otherwise fall back to the heuristic (IDs in edges but not in
+    # the syntax tree).
+    explicit_fakes = data.get('fakeNodes', [])
+    if explicit_fakes:
+        fake_node_ids = {int(fid) for fid in explicit_fakes}
+    else:
+        all_edge_ids = set()
+        for edge in edges:
+            fid = edge.get('fromId')
+            tid = edge.get('toId')
+            if fid is not None:
+                all_edge_ids.add(fid)
+            if tid is not None:
+                all_edge_ids.add(tid)
+        fake_node_ids = all_edge_ids - set(unique_id_to_info.keys())
     
     # Treat fake nodes as novel so bridge edges pass the filter
     novel_with_fakes = novel_unique_ids | fake_node_ids
@@ -629,13 +633,27 @@ def create_diff_nodes(
         json.dump(output, f, indent=2)
 
 
+def get_node_content(node: dict) -> str:
+    """Extract display content from a syntax node.
+    SimpleName nodes have 'content'; QualifiedName nodes are lists whose
+    content must be reconstructed by joining their leaf SimpleName children."""
+    if 'content' in node:
+        return node['content']
+    # QualifiedName (or other list nodes): recursively collect leaf content
+    parts = []
+    for child in node.get('children', []):
+        if isinstance(child, dict):
+            parts.append(get_node_content(child))
+    return '.'.join(parts) if parts else node.get('open_content', '')
+
+
 def generate_rename_name(
         lhs_node: dict, lhs_parent: dict, lhs_tree: dict,
         rhs_node: dict, rhs_parent: dict, rhs_tree: dict) -> str:
     parent_class = lhs_parent['nodeClass']
     assert(lhs_node['nodeClass'] == 'SimpleName' and rhs_node['nodeClass'] == 'SimpleName')
-    lhs_name = lhs_node['content']
-    rhs_name = rhs_node['content']
+    lhs_name = get_node_content(lhs_node)
+    rhs_name = get_node_content(rhs_node)
     if parent_class == 'TypeDeclaration':
         renamed_kind = 'type'
     elif parent_class == 'VariableDeclarationFragment':
@@ -654,13 +672,13 @@ def generate_rename_name(
         if ancestor is None:
             break
         if ancestor['nodeClass'] == 'MethodDeclaration':
-            method_name = ancestor['children'][0]['content']
+            method_name = get_node_content(ancestor['children'][0])
             base_name += f' in {method_name}'
             break
         if ancestor['nodeClass'] in ('TypeDeclaration', 'EnumDeclaration', 'AnnotationTypeDeclaration',
                                      'RecordDeclaration', 'AnonymousClassDeclaration'):
             if ancestor['nodeClass'] != 'AnonymousClassDeclaration' and ancestor.get('children'):
-                class_name = ancestor['children'][0]['content']
+                class_name = get_node_content(ancestor['children'][0])
                 base_name += f' in {class_name}'
             break
         current_node = ancestor
@@ -719,9 +737,9 @@ def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
         if tp_parent and tp_parent['nodeClass'] == 'Structural':
             _, tp_grandparent = find_id(tree, tp_parent['uniqueId'])
             if tp_grandparent and tp_grandparent['nodeClass'] in ('TypeDeclaration', 'MethodDeclaration'):
-                owner_name = tp_grandparent['children'][0]['content']
+                owner_name = get_node_content(tp_grandparent['children'][0])
                 assert name_loc['nodeClass'] == 'SimpleName'
-                return f'{added_kind} {name_loc['content']} {action} in {owner_name}'
+                return f'{added_kind} {get_node_content(name_loc)} {action} in {owner_name}'
     elif node_class == 'ImportDeclaration':
         added_kind = 'import'
         name_loc = node['children'][0]
@@ -739,7 +757,7 @@ def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
             return f'{content} {action}'
         return generate_addrem_name(parent, add, tree)
     assert name_loc['nodeClass'] == 'SimpleName' or name_loc['nodeClass'] == 'QualifiedName' #TODO, fix
-    base_name = f'{added_kind} {name_loc["content"]} {action}'
+    base_name = f'{added_kind} {get_node_content(name_loc)} {action}'
     # Find enclosing method or class by walking up ancestors
     current_node = node
     while current_node:
@@ -747,14 +765,14 @@ def generate_addrem_name(node: dict, add: bool, tree: dict) -> str:
         if ancestor is None:
             break
         if ancestor['nodeClass'] == 'MethodDeclaration':
-            method_name = ancestor['children'][0]['content']
+            method_name = get_node_content(ancestor['children'][0])
             base_name += f' in {method_name}'
             break
         if ancestor['nodeClass'] in ('TypeDeclaration', 'EnumDeclaration', 'AnnotationTypeDeclaration',
                                      'RecordDeclaration', 'AnonymousClassDeclaration'):
             # children[0] is the SimpleName for named types; AnonymousClassDeclaration has no name
             if ancestor['nodeClass'] != 'AnonymousClassDeclaration' and ancestor.get('children'):
-                class_name = ancestor['children'][0]['content']
+                class_name = get_node_content(ancestor['children'][0])
                 base_name += f' in {class_name}'
             break
         current_node = ancestor

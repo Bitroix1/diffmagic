@@ -121,8 +121,8 @@ public class Main {
             rhsOutput.put("nameResEdges", rhsNameResEdges);
             lhsOutput.put("syntax", lhsSyntaxes);
             rhsOutput.put("syntax", rhsSyntaxes);
-            lhsOutput.put("fakeEdges", lhsResult.fakeNodeIds);
-            rhsOutput.put("fakeEdges", rhsResult.fakeNodeIds);
+            lhsOutput.put("fakeNodes", lhsResult.fakeNodeIds);
+            rhsOutput.put("fakeNodes", rhsResult.fakeNodeIds);
 
             // Stream JSON directly to files to avoid huge in-memory strings
             Gson gson = new GsonBuilder().setPrettyPrinting().create();

@@ -9,7 +9,7 @@ public class EdgeAdder {
     private List<Main.Edge> nameResEdges;
     private List<CompilationUnit> compilationUnits;
 //    private Map<String, List<ImportDeclaration>> allImportsMap;
-    private AST fakeNodesAST = new AST();
+    private AST fakeNodesAST = AST.newAST(AST.getJLSLatest(), false);
     // missing nodes are mapped by recovered binding key -> id -> simplename
     private Map<String,Map<String,SimpleName>> missingNodes = new HashMap<>();
     
@@ -59,7 +59,14 @@ public class EdgeAdder {
                     // resolved declaration, so the path goes:
                     //   usage -> import line -> actual declaration
                     // This connects usages across files that share the same import.
-                    if (localImports.containsKey(node.getIdentifier())) {
+                    // Skip if this SimpleName is inside an ImportDeclaration itself
+                    // (otherwise the import's own name acts as a "usage" hub that
+                    // bridges all real usages into one component).
+                    boolean insideImport = false;
+                    for (ASTNode p = node.getParent(); p != null; p = p.getParent()) {
+                        if (p instanceof ImportDeclaration) { insideImport = true; break; }
+                    }
+                    if (!insideImport && localImports.containsKey(node.getIdentifier())) {
                         ImportDeclaration declaringImport = localImports.get(node.getIdentifier());
                         SimpleName importSimpleName;
                         if (declaringImport.getName().isSimpleName()) {

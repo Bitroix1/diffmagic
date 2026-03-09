@@ -2309,7 +2309,8 @@ public class SyntaxVisitor extends ASTVisitor {
 	 */
 	public boolean visit(QualifiedName node) {
 		syntaxMap = new HashMap<>();
-//		String content = node.getFullyQualifiedName();
+		
+		createListFromNode(syntaxMap, node);
 		
 		Name qualifier = node.getQualifier();
 		SimpleName name = node.getName();
