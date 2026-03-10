@@ -941,7 +941,9 @@ def create_diff_components(
                 # Strip .java extension if present
                 if filename.endswith('.java'):
                     filename = filename[:-5]
-                final_component_name += f' in {filename}'
+                # Don't append file name if the component name already ends with the same class name
+                if not final_component_name.endswith(f' in {filename}'):
+                    final_component_name += f' in {filename}'
 
             final_components.append({
                 'component_id': component_id,
